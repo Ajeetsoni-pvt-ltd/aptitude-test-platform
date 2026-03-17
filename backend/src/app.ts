@@ -4,7 +4,7 @@
 // app.ts = middleware + routes setup (server start NAHI hota yahan)
 // Reason: Testing ke liye app ko server se alag rakhte hain
 // ─────────────────────────────────────────────────────────────
-
+import errorHandler from './middlewares/errorHandler';
 import express, { Application, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -78,12 +78,6 @@ app.use((_req: Request, res: Response) => {
 // ─── Global Error Handler ──────────────────────────────────────
 // Express ka built-in error handler override karte hain
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  console.error('❌ Global Error:', err.message);
-  res.status(500).json({
-    success: false,
-    message: err.message || 'Internal Server Error',
-  });
-});
+app.use(errorHandler);
 
 export default app;
