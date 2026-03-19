@@ -10,7 +10,9 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
-
+import authRoutes from './routes/authRoutes';
+import questionRoutes from './routes/questionRoutes';
+import testRoutes from './routes/testRoutes';
 const app: Application = express();
 
 // ─── Security Middleware ───────────────────────────────────────
@@ -61,10 +63,11 @@ app.get('/health', (_req: Request, res: Response) => {
   });
 });
 
-// ─── API Routes (Phase 3 mein add honge step by step) ─────────
-// app.use('/api/auth', authRoutes);       // Step 3 mein uncomment karenge
-// app.use('/api/questions', questionRoutes); // Step 5 mein uncomment karenge
-// app.use('/api/tests', testRoutes);      // Step 6 mein uncomment karenge
+// ─── API Routes ────────────────────────────────────────────────
+app.use('/api/auth', authRoutes);           // ✅ Step 3 LIVE
+app.use('/api/questions', questionRoutes);  // Step 5 mein fill hoga
+app.use('/api/tests', testRoutes);          // Step 6 mein fill hoga
+
 
 // ─── 404 Handler ──────────────────────────────────────────────
 // Yeh tab chalega jab koi route match na ho
