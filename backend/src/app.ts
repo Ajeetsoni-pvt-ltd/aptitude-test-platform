@@ -14,6 +14,7 @@ import authRoutes from './routes/authRoutes';
 import questionRoutes from './routes/questionRoutes';
 import testRoutes from './routes/testRoutes';
 const app: Application = express();
+import uploadRoutes from './routes/uploadRoutes';
 
 // ─── Security Middleware ───────────────────────────────────────
 // helmet: Sets secure HTTP response headers (XSS, clickjacking protection)
@@ -67,6 +68,7 @@ app.get('/health', (_req: Request, res: Response) => {
 app.use('/api/auth', authRoutes);           // ✅ Step 3 LIVE
 app.use('/api/questions', questionRoutes);  // Step 5 mein fill hoga
 app.use('/api/tests', testRoutes);          // Step 6 mein fill hoga
+app.use('/api/upload', uploadRoutes);
 
 
 // ─── 404 Handler ──────────────────────────────────────────────
