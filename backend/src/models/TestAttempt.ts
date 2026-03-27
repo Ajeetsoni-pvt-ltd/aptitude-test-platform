@@ -34,7 +34,8 @@ const testAttemptSchema = new Schema<ITestAttempt>(
     },
     testType: {
       type: String,
-      enum: ['topic-wise', 'subtopic-wise', 'full-mock', 'custom'],
+      enum: ['practice', 'mock', 'sectional', 'full', 'custom'],
+      
       required: true,
     },
     title: {
