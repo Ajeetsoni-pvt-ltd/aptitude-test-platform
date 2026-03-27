@@ -17,6 +17,9 @@ import LoginPage      from '@/pages/LoginPage';
 import RegisterPage   from '@/pages/RegisterPage';
 import DashboardPage  from '@/pages/DashboardPage';
 import NotFoundPage   from '@/pages/NotFoundPage';
+import TestSetupPage from '@/pages/TestSetupPage';
+import TestPage      from '@/pages/TestPage';
+import ResultPage    from '@/pages/ResultPage';
 
 const AppRouter = () => {
   return (
@@ -35,6 +38,9 @@ const AppRouter = () => {
       {/* ─── Protected Routes (Login required) ───────────── */}
       <Route element={<ProtectedRoute />}>
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/test-setup" element={<TestSetupPage />} />   {/* ✅ Naya */}
+        <Route path="/test"       element={<TestPage />} />        {/* ✅ Naya */}
+        <Route path="/result"     element={<ResultPage />} />      {/* ✅ Naya */}
         {/* Phase 7-8 mein aur routes add honge yahan */}
       </Route>
 
