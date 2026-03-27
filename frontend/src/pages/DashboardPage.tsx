@@ -190,7 +190,7 @@ const DashboardPage = () => {
               <div className="flex gap-3 flex-wrap justify-center">
                 <Button
                   className="bg-white text-indigo-600 hover:bg-indigo-50 font-semibold"
-                  onClick={() => alert('Phase 7 mein Test Start hoga! 🚀')}
+                  onClick={() => navigate('/test-setup')}
                 >
                   🚀 Test Start Karo
                 </Button>
