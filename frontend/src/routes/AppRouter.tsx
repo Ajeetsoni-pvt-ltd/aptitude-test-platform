@@ -20,6 +20,7 @@ import NotFoundPage   from '@/pages/NotFoundPage';
 import TestSetupPage from '@/pages/TestSetupPage';
 import TestPage      from '@/pages/TestPage';
 import ResultPage    from '@/pages/ResultPage';
+import AnalysisPage from '@/pages/AnalysisPage';
 
 const AppRouter = () => {
   return (
@@ -41,6 +42,7 @@ const AppRouter = () => {
         <Route path="/test-setup" element={<TestSetupPage />} />   {/* ✅ Naya */}
         <Route path="/test"       element={<TestPage />} />        {/* ✅ Naya */}
         <Route path="/result"     element={<ResultPage />} />      {/* ✅ Naya */}
+        <Route path="/analysis" element={<AnalysisPage />} />
         {/* Phase 7-8 mein aur routes add honge yahan */}
       </Route>
 

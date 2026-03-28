@@ -207,6 +207,25 @@ const DashboardPage = () => {
             </div>
           </CardContent>
         </Card>
+        <Card className="border-0 shadow-md mb-8 bg-white">
+  <CardContent className="p-5">
+    <div className="flex items-center justify-between">
+      <div>
+        <h3 className="font-bold text-gray-800">📊 Performance Analysis</h3>
+        <p className="text-gray-500 text-sm mt-0.5">
+          Score trends, topic breakdown, charts dekho
+        </p>
+      </div>
+      <Button
+        onClick={() => navigate('/analysis')}
+        variant="outline"
+        className="border-indigo-300 text-indigo-600 hover:bg-indigo-50"
+      >
+        Analysis Dekho →
+      </Button>
+    </div>
+  </CardContent>
+</Card>
 
         {/* ─── Recent Attempts ──────────────────────────── */}
         <Card className="border-0 shadow-md">
