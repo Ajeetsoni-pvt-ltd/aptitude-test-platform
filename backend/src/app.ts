@@ -15,6 +15,7 @@ import questionRoutes from './routes/questionRoutes';
 import testRoutes from './routes/testRoutes';
 const app: Application = express();
 import uploadRoutes from './routes/uploadRoutes';
+import adminRoutes from './routes/adminRoutes';
 
 // ─── Security Middleware ───────────────────────────────────────
 // helmet: Sets secure HTTP response headers (XSS, clickjacking protection)
@@ -69,6 +70,7 @@ app.use('/api/auth', authRoutes);           // ✅ Step 3 LIVE
 app.use('/api/questions', questionRoutes);  // Step 5 mein fill hoga
 app.use('/api/tests', testRoutes);          // Step 6 mein fill hoga
 app.use('/api/upload', uploadRoutes);
+app.use('/api/admin', adminRoutes);  // ✅ Add karo
 
 
 // ─── 404 Handler ──────────────────────────────────────────────
