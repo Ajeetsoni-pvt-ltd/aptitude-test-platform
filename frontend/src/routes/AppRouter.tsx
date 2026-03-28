@@ -21,6 +21,10 @@ import TestSetupPage from '@/pages/TestSetupPage';
 import TestPage      from '@/pages/TestPage';
 import ResultPage    from '@/pages/ResultPage';
 import AnalysisPage from '@/pages/AnalysisPage';
+import AdminDashboard      from '@/pages/admin/AdminDashboard';
+import UploadQuestionsPage from '@/pages/admin/UploadQuestionsPage';
+import QuestionsPage       from '@/pages/admin/QuestionsPage';
+import UsersPage           from '@/pages/admin/UsersPage';
 
 const AppRouter = () => {
   return (
@@ -48,6 +52,10 @@ const AppRouter = () => {
 
       {/* ─── Admin Only Routes ────────────────────────────── */}
       <Route element={<ProtectedRoute adminOnly={true} />}>
+      <Route path="/admin"           element={<AdminDashboard />} />
+      <Route path="/admin/upload"    element={<UploadQuestionsPage />} />
+      <Route path="/admin/questions" element={<QuestionsPage />} />
+      <Route path="/admin/users"     element={<UsersPage />} />
         {/* Phase 4/5 mein admin pages add honge */}
         {/* <Route path="/admin" element={<AdminPage />} /> */}
       </Route>
