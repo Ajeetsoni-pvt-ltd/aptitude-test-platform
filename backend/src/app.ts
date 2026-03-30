@@ -21,11 +21,22 @@ import adminRoutes from './routes/adminRoutes';
 // helmet: Sets secure HTTP response headers (XSS, clickjacking protection)
 app.use(helmet());
 
-// cors: Allow requests from React frontend (localhost:5173 in dev)
+// cors: Allow requests from React frontend
+const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173')
+  .split(',')
+  .map((o) => o.trim());
+
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
-    credentials: true, // Allow cookies/auth headers
+    origin: (origin, callback) => {
+      // Allow requests with no origin (e.g. mobile apps, curl, Postman)
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS: origin ${origin} not allowed`));
+      }
+    },
+    credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   })
 );
