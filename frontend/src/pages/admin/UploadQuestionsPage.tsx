@@ -4,7 +4,6 @@ import AdminLayout from '@/components/AdminLayout';
 import apiClient from '@/api/axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 
 const UploadQuestionsPage = () => {
   const [file, setFile]           = useState<File | null>(null);

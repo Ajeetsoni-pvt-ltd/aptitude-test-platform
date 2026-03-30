@@ -1,66 +1,71 @@
 // frontend/src/routes/AppRouter.tsx
 // ─────────────────────────────────────────────────────────────
-// React Router v6 — All Routes Defined Here
-// Structure:
-//   Public Routes   → /login, /register
-//   Protected Routes → /dashboard
-//   Admin Routes    → /admin/*
-//   Catch-all       → 404
+// All Routes — Public, Protected, Admin
 // ─────────────────────────────────────────────────────────────
 
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './ProtectedRoute';
-import PublicRoute from './PublicRoute';
+import PublicRoute    from './PublicRoute';
 
-// Pages
-import LoginPage      from '@/pages/LoginPage';
-import RegisterPage   from '@/pages/RegisterPage';
+// ── Public pages ──────────────────────────────────────────────
+import LoginPage    from '@/pages/LoginPage';
+import RegisterPage from '@/pages/RegisterPage';
+
+// ── Protected user pages ──────────────────────────────────────
 import DashboardPage  from '@/pages/DashboardPage';
-import NotFoundPage   from '@/pages/NotFoundPage';
-import TestSetupPage from '@/pages/TestSetupPage';
-import TestPage      from '@/pages/TestPage';
-import ResultPage    from '@/pages/ResultPage';
-import AnalysisPage from '@/pages/AnalysisPage';
+import TestSetupPage  from '@/pages/TestSetupPage';
+import TestPage       from '@/pages/TestPage';
+import ResultPage     from '@/pages/ResultPage';
+import AnalysisPage   from '@/pages/AnalysisPage';
+import ProfilePage    from '@/pages/ProfilePage';
+import HistoryPage    from '@/pages/HistoryPage';
+import LeaderboardPage from '@/pages/LeaderboardPage';
+import SettingsPage   from '@/pages/SettingsPage';
+
+// ── Admin pages ───────────────────────────────────────────────
 import AdminDashboard      from '@/pages/admin/AdminDashboard';
 import UploadQuestionsPage from '@/pages/admin/UploadQuestionsPage';
 import QuestionsPage       from '@/pages/admin/QuestionsPage';
 import UsersPage           from '@/pages/admin/UsersPage';
 
+// ── 404 ───────────────────────────────────────────────────────
+import NotFoundPage from '@/pages/NotFoundPage';
+
 const AppRouter = () => {
   return (
     <Routes>
 
-      {/* ─── Default: "/" → "/login" pe redirect ─────────── */}
+      {/* ── Default redirect ──────────────────────────────── */}
       <Route path="/" element={<Navigate to="/login" replace />} />
 
-      {/* ─── Public Routes ────────────────────────────────── */}
-      {/* Already logged in? → /dashboard pe jaao             */}
+      {/* ── Public Routes (redirect if already logged in) ─── */}
       <Route element={<PublicRoute />}>
         <Route path="/login"    element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
       </Route>
 
-      {/* ─── Protected Routes (Login required) ───────────── */}
+      {/* ── Protected Routes (login required) ───────────────── */}
       <Route element={<ProtectedRoute />}>
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/test-setup" element={<TestSetupPage />} />   {/* ✅ Naya */}
-        <Route path="/test"       element={<TestPage />} />        {/* ✅ Naya */}
-        <Route path="/result"     element={<ResultPage />} />      {/* ✅ Naya */}
-        <Route path="/analysis" element={<AnalysisPage />} />
-        {/* Phase 7-8 mein aur routes add honge yahan */}
+        <Route path="/dashboard"    element={<DashboardPage />} />
+        <Route path="/test-setup"   element={<TestSetupPage />} />
+        <Route path="/test"         element={<TestPage />} />
+        <Route path="/result"       element={<ResultPage />} />
+        <Route path="/analysis"     element={<AnalysisPage />} />
+        <Route path="/profile"      element={<ProfilePage />} />
+        <Route path="/history"      element={<HistoryPage />} />
+        <Route path="/leaderboard"  element={<LeaderboardPage />} />
+        <Route path="/settings"     element={<SettingsPage />} />
       </Route>
 
-      {/* ─── Admin Only Routes ────────────────────────────── */}
+      {/* ── Admin Only Routes ────────────────────────────────── */}
       <Route element={<ProtectedRoute adminOnly={true} />}>
-      <Route path="/admin"           element={<AdminDashboard />} />
-      <Route path="/admin/upload"    element={<UploadQuestionsPage />} />
-      <Route path="/admin/questions" element={<QuestionsPage />} />
-      <Route path="/admin/users"     element={<UsersPage />} />
-        {/* Phase 4/5 mein admin pages add honge */}
-        {/* <Route path="/admin" element={<AdminPage />} /> */}
+        <Route path="/admin"           element={<AdminDashboard />} />
+        <Route path="/admin/upload"    element={<UploadQuestionsPage />} />
+        <Route path="/admin/questions" element={<QuestionsPage />} />
+        <Route path="/admin/users"     element={<UsersPage />} />
       </Route>
 
-      {/* ─── 404 Catch-all ────────────────────────────────── */}
+      {/* ── 404 ────────────────────────────────────────────── */}
       <Route path="*" element={<NotFoundPage />} />
 
     </Routes>

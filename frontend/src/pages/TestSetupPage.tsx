@@ -1,257 +1,337 @@
-// frontend/src/pages/TestSetupPage.tsx
-// ─────────────────────────────────────────────────────────────
-// Test Setup Page — Topic, Difficulty, Count choose karo
-// Start button → API call → TestPage mein navigate
-// Data React Router state se pass hoga [web:196]
-// ─────────────────────────────────────────────────────────────
+// src/pages/TestSetupPage.tsx
+// Futuristic multi-step test configuration wizard
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuthStore } from '@/store/authStore';
 import { startTestApi } from '@/api/testApi';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import {
-  Select, SelectContent, SelectItem,
-  SelectTrigger, SelectValue,
-} from '@/components/ui/select';
+import AppLayout from '@/components/layout/AppLayout';
+import NeonCard from '@/components/ui/NeonCard';
+import HoloButton from '@/components/ui/HoloButton';
+import { ChevronRight, ChevronLeft, Zap, Brain, Hash, Clock, AlertTriangle, Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-// ─── Topic Options ─────────────────────────────────────────────
+// ── Data ─────────────────────────────────────────────────────────
 const TOPICS = [
-  { value: 'Quantitative Aptitude', label: '🔢 Quantitative Aptitude', color: 'bg-blue-50 border-blue-200' },
-  { value: 'Verbal Ability',        label: '📖 Verbal Ability',        color: 'bg-green-50 border-green-200' },
-  { value: 'Logical Reasoning',     label: '🧠 Logical Reasoning',     color: 'bg-purple-50 border-purple-200' },
+  { value: 'Quantitative Aptitude', label: 'Quantitative Aptitude', icon: '🔢', desc: 'Numbers, arithmetic, algebra', color: 'cyan' },
+  { value: 'Verbal Ability',        label: 'Verbal Ability',        icon: '📖', desc: 'Grammar, vocabulary, comprehension', color: 'violet' },
+  { value: 'Logical Reasoning',     label: 'Logical Reasoning',     icon: '🧠', desc: 'Patterns, puzzles, deductions', color: 'magenta' },
 ];
 
 const DIFFICULTIES = [
-  { value: 'easy',   label: '🟢 Easy',   desc: 'Beginners ke liye' },
-  { value: 'medium', label: '🟡 Medium', desc: 'Intermediate level' },
-  { value: 'hard',   label: '🔴 Hard',   desc: 'Advanced / Competitive' },
+  { value: 'easy',   label: 'Easy',   desc: 'Foundation level', icon: '●', color: 'text-neon-green' },
+  { value: 'medium', label: 'Medium', desc: 'Intermediate',     icon: '●', color: 'text-neon-amber' },
+  { value: 'hard',   label: 'Hard',   desc: 'Competitive exam', icon: '●', color: 'text-neon-red' },
+  { value: 'all',    label: 'Mixed',  desc: 'All difficulties', icon: '◆', color: 'text-neon-cyan' },
 ];
 
 const QUESTION_COUNTS = [5, 10, 15, 20, 25, 30];
 
+// ── Step indicator ────────────────────────────────────────────────
+const StepDot = ({ step, current, label }: { step: number; current: number; label: string }) => {
+  const done   = step < current;
+  const active = step === current;
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      <div className={cn(
+        'w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-bold transition-all duration-300',
+        done   && 'bg-neon-cyan border-neon-cyan text-cyber-black shadow-[0_0_12px_rgba(0,245,255,0.6)]',
+        active && 'bg-neon-violet/20 border-neon-violet text-neon-violet shadow-[0_0_12px_rgba(157,0,255,0.4)] animate-neon-pulse',
+        !done && !active && 'border-white/15 text-white/20'
+      )}>
+        {done ? <Check size={14} /> : step}
+      </div>
+      <span className={cn('text-[10px] font-inter uppercase tracking-wider', active ? 'text-neon-violet' : done ? 'text-neon-cyan' : 'text-white/20')}>
+        {label}
+      </span>
+    </div>
+  );
+};
+
+// ── Main component ────────────────────────────────────────────────
 const TestSetupPage = () => {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const [step,     setStep]     = useState(1);
+  const [topic,    setTopic]    = useState('');
+  const [diff,     setDiff]     = useState('all');
+  const [count,    setCount]    = useState(10);
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState('');
 
-  // ─── Form State ────────────────────────────────────────────
-  const [selectedTopic,      setSelectedTopic]      = useState('');
-  const [selectedDifficulty, setSelectedDifficulty] = useState('');
-  const [questionCount,      setQuestionCount]      = useState(10);
-  const [isLoading,          setIsLoading]          = useState(false);
-  const [error,              setError]              = useState('');
+  const timeMin    = count * 2;
+  const timeSeconds = count * 2 * 60;
 
-  // ─── Time calculate karo (2 min per question) ─────────────
-  const totalTimeSeconds = questionCount * 2 * 60;
-  const totalTimeMin     = questionCount * 2;
-
-  // ─── Start Test Handler ────────────────────────────────────
-  const handleStartTest = async () => {
-    if (!selectedTopic) {
-      setError('Pehle topic choose karo!');
-      return;
-    }
-
+  const handleStart = async () => {
+    if (!topic) { setError('Please select a topic first.'); return; }
     setError('');
-    setIsLoading(true);
-
+    setLoading(true);
     try {
-      const response = await startTestApi({
-        topic:      selectedTopic,
-        difficulty: selectedDifficulty || undefined,
-        count:      questionCount,
-        title:      `${selectedTopic} - ${selectedDifficulty || 'Mixed'} (${questionCount}Q)`,
+      const res = await startTestApi({
+        topic,
+        difficulty: diff === 'all' ? undefined : diff,
+        count,
+        title: `${topic} — ${diff === 'all' ? 'Mixed' : diff.charAt(0).toUpperCase() + diff.slice(1)} (${count}Q)`,
       });
-
-      if (response.success && response.data) {
-        // Data state se pass karo → TestPage mein milega [web:196]
+      if (res.success && res.data) {
         navigate('/test', {
           state: {
-            attemptId:      response.data.attemptId,
-            questions:      response.data.questions,
-            title:          response.data.title,
-            totalQuestions: response.data.totalQuestions,
-            totalTime:      totalTimeSeconds,
+            attemptId:      res.data.attemptId,
+            questions:      res.data.questions,
+            title:          res.data.title,
+            totalQuestions: res.data.totalQuestions,
+            totalTime:      timeSeconds,
           },
         });
       }
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })
-          ?.response?.data?.message || 'Test start nahi ho saka. Dobara try karo.';
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to start test. Please try again.';
       setError(msg);
-    } finally {
-      setIsLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
-
-      {/* ─── Navbar ──────────────────────────────────────── */}
-      <nav className="bg-white border-b shadow-sm px-4 py-3 flex items-center justify-between sticky top-0 z-10">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">🎯</span>
-          <span className="font-bold text-gray-800">Aptitude Test Platform</span>
+    <AppLayout>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8 animate-fade-up">
+        <div>
+          <p className="text-white/30 text-xs font-inter uppercase tracking-widest mb-1">Initiate</p>
+          <h1 className="font-orbitron text-2xl font-bold text-white tracking-wide">
+            Test <span className="gradient-text-cyan-violet">Configuration</span>
+          </h1>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-600">{user?.name}</span>
-          <Badge variant="outline" className="text-indigo-600 border-indigo-300 text-xs">
-            🎓 Student
-          </Badge>
-          <Button variant="outline" size="sm" onClick={() => navigate('/dashboard')}>
-            ← Dashboard
-          </Button>
-        </div>
-      </nav>
+      </div>
 
-      {/* ─── Main Content ──────────────────────────────────── */}
-      <main className="max-w-2xl mx-auto px-4 py-10">
+      {/* Step indicator */}
+      <div className="flex items-center gap-3 mb-8 animate-fade-up">
+        <StepDot step={1} current={step} label="Topic" />
+        <div className="flex-1 h-px bg-gradient-to-r from-neon-cyan/30 via-white/10 to-neon-violet/30" />
+        <StepDot step={2} current={step} label="Config" />
+        <div className="flex-1 h-px bg-gradient-to-r from-neon-violet/30 via-white/10 to-neon-cyan/30" />
+        <StepDot step={3} current={step} label="Confirm" />
+      </div>
 
-        {/* Title */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900">Test Configure Karo 🎯</h1>
-          <p className="text-gray-500 mt-2">
-            Topic aur difficulty choose karo — phir full focus mode mein practice karo!
-          </p>
-        </div>
+      <div className="grid lg:grid-cols-3 gap-6">
 
-        <Card className="shadow-xl border-0">
-          <CardHeader>
-            <CardTitle className="text-xl text-gray-800">📋 Test Settings</CardTitle>
-            <CardDescription>Apne level ke hisaab se customize karo</CardDescription>
-          </CardHeader>
+        {/* ── Left: Wizard steps ─────────────────────────────── */}
+        <div className="lg:col-span-2 space-y-6">
 
-          <CardContent className="space-y-6">
+          {/* STEP 1: Topic */}
+          {step === 1 && (
+            <NeonCard variant="cyan" className="animate-fade-up" padding="p-6">
+              <h2 className="font-inter font-semibold text-white mb-1 flex items-center gap-2">
+                <Brain size={18} className="text-neon-cyan" />
+                Choose Your Domain
+              </h2>
+              <p className="text-white/30 text-sm mb-5 font-inter">Select the aptitude category to practice</p>
 
-            {/* ─── Topic Select ──────────────────────────── */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                📚 Topic Choose Karo *
-              </label>
-              <div className="grid grid-cols-1 gap-3">
-                {TOPICS.map((topic) => (
+              <div className="space-y-3">
+                {TOPICS.map((t) => (
                   <button
-                    key={topic.value}
-                    onClick={() => { setSelectedTopic(topic.value); setError(''); }}
-                    className={`w-full p-4 rounded-xl border-2 text-left font-medium transition-all
-                      ${selectedTopic === topic.value
-                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-md scale-[1.01]'
-                        : `${topic.color} text-gray-700 hover:border-indigo-300`
-                      }`}
+                    key={t.value}
+                    onClick={() => { setTopic(t.value); setError(''); }}
+                    className={cn(
+                      'w-full flex items-center gap-4 p-4 rounded-xl border transition-all duration-300 text-left group',
+                      topic === t.value
+                        ? t.color === 'cyan'    ? 'border-neon-cyan/60 bg-neon-cyan/8 shadow-[0_0_20px_rgba(0,245,255,0.15)]'
+                        : t.color === 'violet'  ? 'border-neon-violet/60 bg-neon-violet/8 shadow-[0_0_20px_rgba(157,0,255,0.15)]'
+                        : 'border-neon-magenta/60 bg-neon-magenta/8 shadow-[0_0_20px_rgba(255,0,170,0.15)]'
+                        : 'border-white/8 hover:border-white/20 bg-white/[0.02]'
+                    )}
                   >
-                    {topic.label}
-                    {selectedTopic === topic.value && (
-                      <span className="float-right text-indigo-500">✓ Selected</span>
+                    <span className="text-2xl">{t.icon}</span>
+                    <div className="flex-1">
+                      <p className={cn('font-inter font-semibold text-sm transition-colors',
+                        topic === t.value
+                          ? t.color === 'cyan' ? 'text-neon-cyan' : t.color === 'violet' ? 'text-neon-violet' : 'text-neon-magenta'
+                          : 'text-white/70 group-hover:text-white/90')}>
+                        {t.label}
+                      </p>
+                      <p className="text-white/30 text-xs font-inter mt-0.5">{t.desc}</p>
+                    </div>
+                    {topic === t.value && (
+                      <div className={cn(
+                        'w-6 h-6 rounded-full flex items-center justify-center',
+                        t.color === 'cyan' ? 'bg-neon-cyan text-cyber-black' : t.color === 'violet' ? 'bg-neon-violet text-white' : 'bg-neon-magenta text-white'
+                      )}>
+                        <Check size={12} />
+                      </div>
                     )}
                   </button>
                 ))}
               </div>
-            </div>
 
-            {/* ─── Difficulty Select ─────────────────────── */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                💪 Difficulty (Optional)
-              </label>
-              <Select onValueChange={setSelectedDifficulty}>
-                <SelectTrigger className="h-11">
-                  <SelectValue placeholder="🎲 Mixed (All difficulties)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">🎲 Mixed (All difficulties)</SelectItem>
-                  {DIFFICULTIES.map((d) => (
-                    <SelectItem key={d.value} value={d.value}>
-                      {d.label} — {d.desc}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* ─── Question Count ────────────────────────── */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-3">
-                🔢 Questions Kitne Chahiye?
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {QUESTION_COUNTS.map((count) => (
-                  <button
-                    key={count}
-                    onClick={() => setQuestionCount(count)}
-                    className={`px-5 py-2 rounded-lg font-semibold border-2 transition-all
-                      ${questionCount === count
-                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
-                        : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'
-                      }`}
-                  >
-                    {count}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* ─── Test Summary Card ─────────────────────── */}
-            <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100">
-              <h3 className="font-semibold text-indigo-800 mb-2">📊 Test Summary</h3>
-              <div className="grid grid-cols-3 gap-3 text-center">
-                <div className="bg-white rounded-lg p-3">
-                  <p className="text-2xl font-bold text-indigo-600">{questionCount}</p>
-                  <p className="text-xs text-gray-500">Questions</p>
+              {error && (
+                <div className="mt-4 flex items-center gap-2 p-3 rounded-lg bg-neon-red/8 border border-neon-red/25 animate-fade-in">
+                  <AlertTriangle size={14} className="text-neon-red" />
+                  <p className="text-neon-red text-sm font-inter">{error}</p>
                 </div>
-                <div className="bg-white rounded-lg p-3">
-                  <p className="text-2xl font-bold text-green-600">{totalTimeMin}m</p>
-                  <p className="text-xs text-gray-500">Time Limit</p>
-                </div>
-                <div className="bg-white rounded-lg p-3">
-                  <p className="text-2xl font-bold text-purple-600">
-                    {selectedDifficulty || 'Mix'}
-                  </p>
-                  <p className="text-xs text-gray-500">Difficulty</p>
-                </div>
-              </div>
-            </div>
-
-            {/* ─── Instructions ──────────────────────────── */}
-            <div className="bg-amber-50 rounded-xl p-4 border border-amber-200 text-sm space-y-1">
-              <p className="font-semibold text-amber-800">⚠️ Test Rules — Dhyan Se Padho:</p>
-              <ul className="text-amber-700 space-y-1 list-none">
-                <li>🖥️ Test fullscreen mode mein shuru hoga</li>
-                <li>🚫 Tab switch karna allowed nahi hai</li>
-                <li>📋 Copy/Paste block rahega</li>
-                <li>⏱️ Time khatam hote hi auto-submit ho jaayega</li>
-                <li>🔄 Ek baar submit karne ke baad dobara attempt nahi ho sakta</li>
-              </ul>
-            </div>
-
-            {/* ─── Error Message ─────────────────────────── */}
-            {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-red-600 text-sm">⚠️ {error}</p>
-              </div>
-            )}
-
-            {/* ─── Start Button ──────────────────────────── */}
-            <Button
-              onClick={handleStartTest}
-              disabled={isLoading || !selectedTopic}
-              className="w-full h-13 text-lg font-bold bg-indigo-600 hover:bg-indigo-700 text-white py-4"
-            >
-              {isLoading ? (
-                <span className="flex items-center gap-2 justify-center">
-                  <span className="animate-spin">⏳</span>
-                  Questions load ho rahe hain...
-                </span>
-              ) : (
-                '🚀 Test Shuru Karo!'
               )}
-            </Button>
-          </CardContent>
-        </Card>
-      </main>
-    </div>
+
+              <div className="flex justify-end mt-6">
+                <HoloButton variant="cyan" size="md" onClick={() => { if (!topic) { setError('Select a topic first.'); return; } setStep(2); }} icon={<ChevronRight size={16} />}>
+                  Continue
+                </HoloButton>
+              </div>
+            </NeonCard>
+          )}
+
+          {/* STEP 2: Config */}
+          {step === 2 && (
+            <NeonCard variant="violet" className="animate-fade-up" padding="p-6">
+              <h2 className="font-inter font-semibold text-white mb-1 flex items-center gap-2">
+                <Zap size={18} className="text-neon-violet" />
+                Configure Parameters
+              </h2>
+              <p className="text-white/30 text-sm mb-6 font-inter">Set difficulty and question count</p>
+
+              {/* Difficulty */}
+              <div className="mb-6">
+                <p className="text-white/40 text-xs uppercase tracking-widest mb-3 font-inter">Difficulty Level</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {DIFFICULTIES.map((d) => (
+                    <button
+                      key={d.value}
+                      onClick={() => setDiff(d.value)}
+                      className={cn(
+                        'p-3.5 rounded-xl border text-left transition-all duration-200',
+                        diff === d.value
+                          ? 'border-neon-violet/60 bg-neon-violet/10 shadow-[0_0_15px_rgba(157,0,255,0.15)]'
+                          : 'border-white/8 hover:border-white/20 bg-white/[0.02]'
+                      )}
+                    >
+                      <span className={cn('text-sm font-bold mr-2', d.color)}>{d.icon}</span>
+                      <span className="text-white/80 text-sm font-inter font-medium">{d.label}</span>
+                      <p className="text-white/25 text-xs mt-1 font-inter">{d.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Question count */}
+              <div className="mb-6">
+                <p className="text-white/40 text-xs uppercase tracking-widest mb-3 font-inter flex items-center gap-2">
+                  <Hash size={12} /> Number of Questions
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {QUESTION_COUNTS.map((n) => (
+                    <button
+                      key={n}
+                      onClick={() => setCount(n)}
+                      className={cn(
+                        'w-14 h-14 rounded-xl border-2 font-orbitron font-bold text-lg transition-all duration-200',
+                        count === n
+                          ? 'border-neon-violet bg-neon-violet/15 text-neon-violet shadow-[0_0_15px_rgba(157,0,255,0.3)]'
+                          : 'border-white/10 text-white/40 hover:border-white/25 hover:text-white/70'
+                      )}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-white/20 text-xs mt-2 font-inter flex items-center gap-1.5">
+                  <Clock size={11} /> Estimated time: {timeMin} minutes
+                </p>
+              </div>
+
+              <div className="flex justify-between">
+                <HoloButton variant="ghost" size="md" onClick={() => setStep(1)} icon={<ChevronLeft size={16} />}>
+                  Back
+                </HoloButton>
+                <HoloButton variant="violet" size="md" onClick={() => setStep(3)} icon={<ChevronRight size={16} />}>
+                  Preview
+                </HoloButton>
+              </div>
+            </NeonCard>
+          )}
+
+          {/* STEP 3: Confirm */}
+          {step === 3 && (
+            <NeonCard variant="magenta" className="animate-fade-up" padding="p-6">
+              <h2 className="font-inter font-semibold text-white mb-1 flex items-center gap-2">
+                <Zap size={18} className="text-neon-magenta" />
+                Ready to Launch
+              </h2>
+              <p className="text-white/30 text-sm mb-6 font-inter">Review your configuration before starting</p>
+
+              {/* Rules */}
+              <div className="p-4 rounded-xl bg-neon-amber/5 border border-neon-amber/20 mb-5">
+                <p className="text-neon-amber text-xs font-semibold mb-2 flex items-center gap-1.5">
+                  <AlertTriangle size={13} /> Test Protocols
+                </p>
+                <ul className="space-y-1.5 text-white/40 text-xs font-inter">
+                  {[
+                    'Test opens in fullscreen — do not exit',
+                    'Tab switching is monitored',
+                    'Copy/paste is disabled',
+                    'Auto-submits when time expires',
+                    'Cannot retake the same session',
+                  ].map((r) => (
+                    <li key={r} className="flex items-center gap-2">
+                      <span className="text-neon-amber opacity-60">▸</span> {r}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {error && (
+                <div className="mb-4 flex items-center gap-2 p-3 rounded-lg bg-neon-red/8 border border-neon-red/25 animate-fade-in">
+                  <AlertTriangle size={14} className="text-neon-red" />
+                  <p className="text-neon-red text-sm font-inter">{error}</p>
+                </div>
+              )}
+
+              <div className="flex justify-between">
+                <HoloButton variant="ghost" size="md" onClick={() => setStep(2)} icon={<ChevronLeft size={16} />}>
+                  Back
+                </HoloButton>
+                <HoloButton variant="magenta" size="md" loading={loading} onClick={handleStart}>
+                  🚀 LAUNCH TEST
+                </HoloButton>
+              </div>
+            </NeonCard>
+          )}
+        </div>
+
+        {/* ── Right: Live Preview ────────────────────────────── */}
+        <NeonCard variant="default" padding="p-5" className="h-fit animate-fade-up-delay">
+          <p className="text-white/30 text-xs uppercase tracking-widest mb-4 font-inter">Configuration Preview</p>
+
+          <div className="space-y-4">
+            {[
+              { label: 'Domain',     value: topic    || '—',                         color: 'neon-cyan' },
+              { label: 'Difficulty', value: diff === 'all' ? 'Mixed' : diff.charAt(0).toUpperCase() + diff.slice(1), color: 'neon-violet' },
+              { label: 'Questions',  value: `${count} Q`,                            color: 'neon-green' },
+              { label: 'Time Limit', value: `${timeMin} minutes`,                    color: 'neon-amber' },
+            ].map((item) => (
+              <div key={item.label} className="flex items-center justify-between p-3 rounded-lg bg-white/[0.025] border border-white/5">
+                <span className="text-white/30 text-xs font-inter">{item.label}</span>
+                <span className={cn('text-xs font-mono-code font-semibold', `text-${item.color}`)}>
+                  {item.value}
+                </span>
+              </div>
+            ))}
+
+            {/* Progress ring preview */}
+            <div className="flex justify-center mt-4">
+              <div className="relative">
+                <svg width={100} height={100} viewBox="0 0 100 100" className="-rotate-90">
+                  <circle cx={50} cy={50} r={40} strokeWidth={5} stroke="rgba(255,255,255,0.06)" fill="none" />
+                  <circle cx={50} cy={50} r={40} strokeWidth={5}
+                    stroke="#00F5FF" fill="none" strokeLinecap="round"
+                    strokeDasharray={251.3}
+                    strokeDashoffset={251.3 - (count / 30) * 251.3}
+                    style={{ filter: 'drop-shadow(0 0 6px rgba(0,245,255,0.8))', transition: 'stroke-dashoffset 0.5s ease' }}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="font-orbitron text-xl font-bold text-neon-cyan">{count}</span>
+                  <span className="text-white/25 text-[10px]">questions</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </NeonCard>
+      </div>
+    </AppLayout>
   );
 };
 
