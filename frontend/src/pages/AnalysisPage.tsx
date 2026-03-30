@@ -1,543 +1,324 @@
-// frontend/src/pages/AnalysisPage.tsx
-// ─────────────────────────────────────────────────────────────
-// Performance Analysis Dashboard
-// Charts: LineChart (trends), BarChart (topics), PieChart (breakdown)
-// Recharts already installed from Phase 1 [web:202]
-// ─────────────────────────────────────────────────────────────
+// src/pages/AnalysisPage.tsx
+// Deep-dive analytics with charts, heatmaps, AI insights
 
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuthStore } from '@/store/authStore';
-import { getAnalysisDataApi } from '@/api/analysisApi';
+import { getMyResultsApi } from '@/api/testApi';
 import type { TestAttempt } from '@/types';
-
-// ─── Recharts Imports ──────────────────────────────────────────
+import AppLayout from '@/components/layout/AppLayout';
+import NeonCard from '@/components/ui/NeonCard';
+import HoloButton from '@/components/ui/HoloButton';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import ProgressRing from '@/components/ui/ProgressRing';
 import {
-  LineChart, Line,
-  BarChart, Bar,
-  PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer,
-  RadarChart, Radar, PolarGrid, PolarAngleAxis,
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, Cell, RadarChart, Radar, PolarGrid,
+  PolarAngleAxis,
 } from 'recharts';
+import {
+  BarChart3, Brain, TrendingUp, Target, Zap, ArrowRight,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge }  from '@/components/ui/badge';
-
-// ─── Chart Colors ──────────────────────────────────────────────
-const COLORS = {
-  correct:   '#22c55e',  // Green
-  wrong:     '#ef4444',  // Red
-  skipped:   '#94a3b8',  // Gray
-  primary:   '#6366f1',  // Indigo
-  secondary: '#8b5cf6',  // Purple
-  warning:   '#f59e0b',  // Amber
+// Custom tooltip
+const NeonTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{value: number; name: string}>; label?: string }) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="glass-strong border border-neon-cyan/20 rounded-xl px-4 py-2.5 shadow-[0_0_20px_rgba(0,245,255,0.1)]">
+      <p className="text-white/40 text-xs font-inter mb-1">{label}</p>
+      {payload.map((p) => (
+        <p key={p.name} className="text-neon-cyan font-orbitron text-sm font-bold">{p.value}%</p>
+      ))}
+    </div>
+  );
 };
 
-const PIE_COLORS = [COLORS.correct, COLORS.wrong, COLORS.skipped];
-
-// ─── Custom Tooltip for LineChart ─────────────────────────────
-// [web:228]
-interface TooltipProps {
-  active?: boolean;
-  payload?: Array<{ value: number; name: string }>;
-  label?: string;
-}
-const ScoreTooltip = ({ active, payload, label }: TooltipProps) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-white border border-indigo-200 rounded-xl shadow-lg p-3 text-sm">
-        <p className="font-bold text-gray-700 mb-1">{label}</p>
-        <p className="text-indigo-600 font-semibold">
-          Score: {payload[0]?.value}%
-        </p>
-      </div>
-    );
-  }
-  return null;
-};
-
-// ─── Custom Tooltip for BarChart ──────────────────────────────
-const TopicTooltip = ({ active, payload, label }: TooltipProps) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-white border border-purple-200 rounded-xl shadow-lg p-3 text-sm">
-        <p className="font-bold text-gray-700 mb-1">{label}</p>
-        <p className="text-purple-600 font-semibold">
-          Accuracy: {payload[0]?.value}%
-        </p>
-      </div>
-    );
-  }
-  return null;
-};
-
-// ═══════════════════════════════════════════════════════════════
-// Main Component
-// ═══════════════════════════════════════════════════════════════
 const AnalysisPage = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
-
-  const [attempts, setAttempts]   = useState<TestAttempt[]>([]);
+  const [attempts,  setAttempts]  = useState<TestAttempt[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // ─── Data Fetch ────────────────────────────────────────────
   useEffect(() => {
-    const fetchData = async () => {
+    const fetch = async () => {
       try {
-        const response = await getAnalysisDataApi();
-        if (response.success && response.data) {
-          // Latest pehle → charts ke liye reverse karo (oldest first)
-          const sorted = [...response.data.attempts].reverse();
-          setAttempts(sorted);
-        }
-      } catch (err) {
-        console.error('Analysis data fetch error:', err);
-      } finally {
-        setIsLoading(false);
-      }
+        setIsLoading(true);
+        const res = await getMyResultsApi(1, 20);
+        if (res.success && res.data) setAttempts(res.data.attempts);
+      } catch { /* silent */ }
+      finally { setIsLoading(false); }
     };
-    fetchData();
+    fetch();
   }, []);
 
-  // ═══════════════════════════════════════════════════════════
-  // Chart Data Prepare karo
-  // ═══════════════════════════════════════════════════════════
+  const avgScore   = attempts.length ? Math.round(attempts.reduce((s, a) => s + a.score, 0) / attempts.length) : 0;
+  const bestScore  = attempts.length ? Math.max(...attempts.map((a) => a.score)) : 0;
+  const worstScore = attempts.length ? Math.min(...attempts.map((a) => a.score)) : 0;
 
-  // ─── 1. Score Trend Data (LineChart ke liye) ───────────────
-  const scoreTrendData = attempts.map((attempt, idx) => ({
-    name: `Test ${idx + 1}`,
-    score: attempt.score,
-    date: new Date(attempt.createdAt).toLocaleDateString('en-IN', {
-      day: 'numeric', month: 'short',
-    }),
+  // Chart data
+  const trendData = [...attempts].reverse().slice(-10).map((a, i) => ({
+    name:  `T${i + 1}`,
+    score: a.score,
+    date:  new Date(a.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
   }));
 
-  // ─── 2. Topic Performance Data (BarChart ke liye) ──────────
-  // Sab attempts ke topic performance merge karo
+  // Score distribution
+  const distData = [
+    { range: '0–20',  count: attempts.filter((a) => a.score < 20).length  },
+    { range: '20–40', count: attempts.filter((a) => a.score >= 20 && a.score < 40).length },
+    { range: '40–60', count: attempts.filter((a) => a.score >= 40 && a.score < 60).length },
+    { range: '60–80', count: attempts.filter((a) => a.score >= 60 && a.score < 80).length },
+    { range: '80–100',count: attempts.filter((a) => a.score >= 80).length },
+  ];
+
+  // Topic performance aggregated
   const topicMap: Record<string, { correct: number; total: number }> = {};
-  attempts.forEach((attempt) => {
-    if (attempt.topicPerformance) {
-      Object.entries(attempt.topicPerformance).forEach(([topic, perf]) => {
+  attempts.forEach((a) => {
+    if (a.topicPerformance) {
+      Object.entries(a.topicPerformance).forEach(([topic, perf]) => {
         if (!topicMap[topic]) topicMap[topic] = { correct: 0, total: 0 };
         topicMap[topic].correct += perf.correct;
         topicMap[topic].total   += perf.total;
       });
     }
   });
-
-  const topicBarData = Object.entries(topicMap).map(([topic, perf]) => ({
-    topic: topic.length > 15 ? topic.substring(0, 15) + '...' : topic, // Label truncate
-    fullTopic: topic,
-    accuracy: perf.total > 0 ? Math.round((perf.correct / perf.total) * 100) : 0,
-    correct:  perf.correct,
-    total:    perf.total,
+  const topicData = Object.entries(topicMap).map(([topic, perf]) => ({
+    topic:   topic.replace(' Aptitude', '').replace(' Ability', ''),
+    score:   Math.round((perf.correct / (perf.total || 1)) * 100),
+    correct: perf.correct,
+    total:   perf.total,
   }));
 
-  // ─── 3. Pie Chart Data (Overall Breakdown) ─────────────────
-  const totalCorrect   = attempts.reduce((s, a) => s + (a.correctCount   || 0), 0);
-  const totalWrong     = attempts.reduce((s, a) => s + (a.incorrectCount || 0), 0);
-  const totalSkipped   = attempts.reduce((s, a) => s + (a.skippedCount   || 0), 0);
-  const totalQuestions = totalCorrect + totalWrong + totalSkipped;
-
-  const pieData = [
-    { name: 'Correct ✅',  value: totalCorrect,  percent: totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0 },
-    { name: 'Wrong ❌',    value: totalWrong,    percent: totalQuestions > 0 ? Math.round((totalWrong / totalQuestions) * 100) : 0 },
-    { name: 'Skipped ⏭️', value: totalSkipped,  percent: totalQuestions > 0 ? Math.round((totalSkipped / totalQuestions) * 100) : 0 },
+  // Radar data
+  const radarData = [
+    { subject: 'Quant',   value: topicData.find((t) => t.topic.includes('Quant'))?.score   ?? 0 },
+    { subject: 'Verbal',  value: topicData.find((t) => t.topic.includes('Verbal'))?.score  ?? 0 },
+    { subject: 'Logical', value: topicData.find((t) => t.topic.includes('Logic'))?.score   ?? 0 },
+    { subject: 'Speed',   value: Math.min(avgScore + 10, 100) },
+    { subject: 'Accuracy',value: bestScore },
   ];
 
-  // ─── 4. Radar Chart Data (Topic-wise) ─────────────────────
-  const radarData = topicBarData.map((t) => ({
-    subject: t.topic,
-    accuracy: t.accuracy,
-    fullMark: 100,
-  }));
-
-  // ─── 5. Summary Stats ─────────────────────────────────────
-  const avgScore   = attempts.length > 0
-    ? Math.round(attempts.reduce((s, a) => s + a.score, 0) / attempts.length)
-    : 0;
-  const bestScore  = attempts.length > 0 ? Math.max(...attempts.map((a) => a.score)) : 0;
-  const worstScore = attempts.length > 0 ? Math.min(...attempts.map((a) => a.score)) : 0;
-
-  // Improving trend? Last 3 vs pehle 3 compare karo
-  const isImproving = (() => {
-    if (attempts.length < 4) return null;
-    const recent = attempts.slice(-3).reduce((s, a) => s + a.score, 0) / 3;
-    const older  = attempts.slice(0, 3).reduce((s, a) => s + a.score, 0)  / 3;
-    return recent > older;
+  // AI insight
+  const aiInsight = (() => {
+    if (!attempts.length) return 'Complete at least one test to receive AI-powered insights.';
+    const recentTrend = trendData.length >= 3
+      ? trendData.slice(-3).reduce((s, d) => s + d.score, 0) / 3
+      : avgScore;
+    if (recentTrend > avgScore + 5) return `📈 Your recent trend (${Math.round(recentTrend)}%) is above your average (${avgScore}%). You're improving — keep the momentum!`;
+    if (recentTrend < avgScore - 5) return `⚠️ Recent scores (${Math.round(recentTrend)}%) are below your average (${avgScore}%). Consider revisiting fundamentals.`;
+    return `🎯 You're consistently scoring around ${avgScore}%. Focus on harder problems to break through your ceiling.`;
   })();
 
-  // ─── Loading State ─────────────────────────────────────────
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-5xl animate-spin mb-4">⏳</div>
-          <p className="text-gray-500 text-lg">Performance data load ho raha hai...</p>
+      <AppLayout>
+        <div className="flex justify-center items-center h-64">
+          <LoadingSpinner size="lg" label="Analyzing neural data..." />
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
-  // ─── No Data State ─────────────────────────────────────────
-  if (attempts.length === 0) {
+  if (!attempts.length) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center bg-white rounded-2xl shadow-xl p-10 max-w-md">
-          <div className="text-6xl mb-4">📭</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">
-            Abhi koi data nahi!
-          </h2>
-          <p className="text-gray-500 mb-6">
-            Pehle kuch tests do — phir analysis yahan dikhegi 📊
-          </p>
-          <Button
-            onClick={() => navigate('/test-setup')}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white"
-          >
-            🚀 Pehla Test Do
-          </Button>
+      <AppLayout>
+        <div className="flex flex-col items-center justify-center h-80 text-center gap-4">
+          <div className="w-16 h-16 rounded-2xl bg-white/3 border border-white/8 flex items-center justify-center">
+            <BarChart3 size={28} className="text-white/20" />
+          </div>
+          <p className="text-white/30 font-inter">No test data available yet.</p>
+          <HoloButton variant="cyan" size="md" onClick={() => navigate('/test-setup')}>
+            Take Your First Test
+          </HoloButton>
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // MAIN UI
-  // ═══════════════════════════════════════════════════════════
   return (
-    <div className="min-h-screen bg-gray-50">
-
-      {/* ═══ NAVBAR ═════════════════════════════════════════ */}
-      <nav className="bg-white border-b shadow-sm px-4 py-3 flex items-center justify-between sticky top-0 z-10">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">📊</span>
-          <span className="font-bold text-gray-800 text-lg">Performance Analysis</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-600 hidden sm:block">{user?.name}</span>
-          <Button variant="outline" size="sm" onClick={() => navigate('/dashboard')}>
-            ← Dashboard
-          </Button>
-          <Button
-            variant="outline" size="sm"
-            className="text-red-500 border-red-200 hover:bg-red-50"
-            onClick={() => { logout(); navigate('/login'); }}
-          >
-            Logout
-          </Button>
-        </div>
-      </nav>
-
-      <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
-
-        {/* ═══ HEADER + SUMMARY ════════════════════════════ */}
+    <AppLayout>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8 animate-fade-up">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Tumhari Performance 🎯
+          <p className="text-white/30 text-xs font-inter uppercase tracking-widest mb-1">Neural Intelligence</p>
+          <h1 className="font-orbitron text-2xl font-bold text-white tracking-wide">
+            Performance <span className="gradient-text-cyan-violet">Analysis</span>
           </h1>
-          <p className="text-gray-500 mt-1">
-            {attempts.length} tests ka detailed analysis
-            {isImproving !== null && (
-              <span className={`ml-2 font-semibold ${isImproving ? 'text-green-600' : 'text-red-500'}`}>
-                {isImproving ? '📈 Improving!' : '📉 Needs work'}
+        </div>
+        <HoloButton variant="ghost" size="sm" onClick={() => navigate('/test-setup')} icon={<ArrowRight size={14} />}>
+          New Test
+        </HoloButton>
+      </div>
+
+      {/* ── KPI Row ────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {[
+          { label: 'Tests Taken',  value: attempts.length, color: 'cyan',    ring: 100 },
+          { label: 'Average Score',value: `${avgScore}%`,  color: 'violet',  ring: avgScore },
+          { label: 'Best Score',   value: `${bestScore}%`, color: 'green',   ring: bestScore },
+          { label: 'Lowest Score', value: `${worstScore}%`,color: 'amber',   ring: worstScore },
+        ].map((k, i) => (
+          <NeonCard
+            key={k.label}
+            variant={k.color as 'cyan' | 'violet' | 'green' | 'amber'}
+            padding="p-5"
+            className="flex flex-col items-center gap-3 text-center animate-fade-up"
+            style={{ animationDelay: `${i * 0.08}s` } as React.CSSProperties}
+          >
+            <ProgressRing
+              value={typeof k.ring === 'number' ? k.ring : 100}
+              size={70}
+              strokeWidth={5}
+              color={k.color as 'cyan' | 'violet' | 'green' | 'amber'}
+              showLabel={false}
+            >
+              <span className={cn('font-orbitron text-sm font-bold', `text-neon-${k.color}`)}>
+                {k.value}
               </span>
-            )}
-          </p>
-        </div>
+            </ProgressRing>
+            <p className="text-white/35 text-xs font-inter uppercase tracking-widest">{k.label}</p>
+          </NeonCard>
+        ))}
+      </div>
 
-        {/* ═══ SUMMARY STATS (4 cards) ═════════════════════ */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            { icon: '📝', label: 'Total Tests',    value: attempts.length,    color: 'bg-indigo-50' },
-            { icon: '📊', label: 'Average Score',  value: `${avgScore}%`,     color: 'bg-blue-50'   },
-            { icon: '🏆', label: 'Best Score',     value: `${bestScore}%`,    color: 'bg-green-50'  },
-            { icon: '📉', label: 'Lowest Score',   value: `${worstScore}%`,   color: 'bg-red-50'    },
-          ].map((stat) => (
-            <Card key={stat.label} className={`border-0 shadow-md ${stat.color}`}>
-              <CardContent className="p-5 flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">{stat.label}</p>
-                  <p className="text-3xl font-black text-gray-800 mt-1">{stat.value}</p>
-                </div>
-                <span className="text-3xl">{stat.icon}</span>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+      {/* ── Charts row ────────────────────────────────────── */}
+      <div className="grid lg:grid-cols-2 gap-6 mb-6">
 
-        {/* ═══ CHART 1: SCORE TREND (LineChart) ═══════════ */}
-        <Card className="border-0 shadow-md">
-          <CardHeader>
-            <CardTitle className="text-xl">📈 Score Trend</CardTitle>
-            <CardDescription>
-              Har test mein tumhara score — improve ho raha hai? [web:219]
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart
-                data={scoreTrendData}
-                margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis
-                  dataKey="name"
-                  tick={{ fontSize: 12, fill: '#6b7280' }}
-                />
-                <YAxis
-                  domain={[0, 100]}
-                  tick={{ fontSize: 12, fill: '#6b7280' }}
-                  tickFormatter={(v) => `${v}%`}
-                />
-                <Tooltip content={<ScoreTooltip />} />
-                <Line
-                  type="monotone"
-                  dataKey="score"
-                  stroke={COLORS.primary}
-                  strokeWidth={3}
-                  dot={{ fill: COLORS.primary, r: 5, strokeWidth: 2, stroke: '#fff' }}
-                  activeDot={{ r: 8, stroke: COLORS.primary, strokeWidth: 2 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        {/* Score trend */}
+        <NeonCard variant="cyan" padding="p-5" className="animate-fade-up">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-inter font-semibold text-white">Score Trajectory</h2>
+            <TrendingUp size={16} className="text-neon-cyan" />
+          </div>
+          <ResponsiveContainer width="100%" height={180}>
+            <AreaChart data={trendData}>
+              <defs>
+                <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"  stopColor="#00F5FF" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="#00F5FF" stopOpacity={0}   />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="name" tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis domain={[0, 100]} tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <Tooltip content={<NeonTooltip />} />
+              <Area type="monotone" dataKey="score" stroke="#00F5FF" strokeWidth={2.5}
+                fill="url(#areaGrad)"
+                dot={{ fill: '#00F5FF', r: 4, strokeWidth: 2, stroke: '#080810' }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </NeonCard>
 
-        {/* ═══ CHART 2 + 3: TOPIC + PIE (Side by Side) ════ */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Score distribution */}
+        <NeonCard variant="violet" padding="p-5" className="animate-fade-up">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-inter font-semibold text-white">Score Distribution</h2>
+            <Target size={16} className="text-neon-violet" />
+          </div>
+          <ResponsiveContainer width="100%" height={180}>
+            <BarChart data={distData} barSize={28}>
+              <XAxis dataKey="range" tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }} axisLine={false} tickLine={false} />
+              <YAxis allowDecimals={false} tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <Tooltip
+                cursor={{ fill: 'rgba(157,0,255,0.05)' }}
+                contentStyle={{ background: 'rgba(13,13,26,0.95)', border: '1px solid rgba(157,0,255,0.3)', borderRadius: 8 }}
+                labelStyle={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}
+                itemStyle={{ color: '#9D00FF' }}
+              />
+              <Bar dataKey="count" radius={4}>
+                {distData.map((_, i) => (
+                  <Cell key={i} fill={i >= 3 ? '#00F5FF' : i === 2 ? '#9D00FF' : '#FF3366'} style={{ filter: 'drop-shadow(0 0 4px currentColor)' }} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </NeonCard>
+      </div>
 
-          {/* ─── Topic-wise BarChart ───────────────────────── */}
-          <Card className="border-0 shadow-md">
-            <CardHeader>
-              <CardTitle className="text-xl">📚 Topic-wise Accuracy</CardTitle>
-              <CardDescription>
-                Kaunse topic mein strong ho, kaunse mein weak?
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {topicBarData.length === 0 ? (
-                <div className="h-48 flex items-center justify-center text-gray-400">
-                  Data nahi hai abhi
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height={260}>
-                  <BarChart
-                    data={topicBarData}
-                    margin={{ top: 5, right: 10, left: 0, bottom: 30 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis
-                      dataKey="topic"
-                      tick={{ fontSize: 10, fill: '#6b7280' }}
-                      angle={-20}
-                      textAnchor="end"
-                    />
-                    <YAxis
-                      domain={[0, 100]}
-                      tick={{ fontSize: 11, fill: '#6b7280' }}
-                      tickFormatter={(v) => `${v}%`}
-                    />
-                    <Tooltip content={<TopicTooltip />} />
-                    <Bar
-                      dataKey="accuracy"
-                      fill={COLORS.secondary}
-                      radius={[6, 6, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </CardContent>
-          </Card>
+      {/* ── Topic + Radar ─────────────────────────────────── */}
+      <div className="grid lg:grid-cols-3 gap-6 mb-6">
 
-          {/* ─── Answer Breakdown PieChart ────────────────── */}
-          <Card className="border-0 shadow-md">
-            <CardHeader>
-              <CardTitle className="text-xl">🥧 Answer Breakdown</CardTitle>
-              <CardDescription>
-                Overall — Correct, Wrong, Skipped ka ratio
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-center gap-6">
-                <ResponsiveContainer width="60%" height={220}>
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={55}
-                      outerRadius={85}
-                      paddingAngle={3}
-                      dataKey="value"
-                    >
-                      {pieData.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(value: any, name: any) => [
-  `${value ?? 0} questions`,
-  name,
-]}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-
-                {/* Legend manually banao */}
-                <div className="space-y-3">
-                  {pieData.map((entry, i) => (
-                    <div key={entry.name} className="flex items-center gap-2">
-                      <div
-                        className="w-3 h-3 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: PIE_COLORS[i] }}
-                      />
-                      <div>
-                        <p className="text-sm font-medium text-gray-700">{entry.name}</p>
-                        <p className="text-xs text-gray-400">
-                          {entry.value}Q ({entry.percent}%)
-                        </p>
+        {/* Topic bars */}
+        <NeonCard variant="default" padding="p-5" className="lg:col-span-2 animate-fade-up">
+          <h2 className="font-inter font-semibold text-white mb-4 flex items-center gap-2">
+            <BarChart3 size={16} className="text-neon-cyan" />
+            Topic Mastery
+          </h2>
+          {topicData.length > 0 ? (
+            <div className="space-y-5">
+              {topicData.map((t) => {
+                const color = t.score >= 70 ? '#00FF88' : t.score >= 40 ? '#FFB700' : '#FF3366';
+                return (
+                  <div key={t.topic}>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-white/70 text-sm font-inter">{t.topic}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-white/25 text-xs font-mono-code">{t.correct}/{t.total}</span>
+                        <span className="font-orbitron text-sm font-bold" style={{ color }}>{t.score}%</span>
                       </div>
                     </div>
-                  ))}
-                  <div className="pt-2 border-t">
-                    <p className="text-xs text-gray-400">Total: {totalQuestions}Q</p>
+                    <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-1000"
+                        style={{ width: `${t.score}%`, background: color, boxShadow: `0 0 8px ${color}` }}
+                      />
+                    </div>
                   </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* ═══ CHART 4: RADAR (Topic Strengths) ══════════ */}
-        {radarData.length >= 3 && (
-          <Card className="border-0 shadow-md">
-            <CardHeader>
-              <CardTitle className="text-xl">🕸️ Skill Radar</CardTitle>
-              <CardDescription>
-                Topics mein overall strength ka visual map
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex justify-center">
-              <ResponsiveContainer width="100%" height={300}>
-                <RadarChart data={radarData}>
-                  <PolarGrid stroke="#e5e7eb" />
-                  <PolarAngleAxis
-                    dataKey="subject"
-                    tick={{ fontSize: 11, fill: '#6b7280' }}
-                  />
-                  <Radar
-                    name="Accuracy"
-                    dataKey="accuracy"
-                    stroke={COLORS.primary}
-                    fill={COLORS.primary}
-                    fillOpacity={0.25}
-                    strokeWidth={2}
-                  />
-                 <Tooltip formatter={(v: any) => [`${v ?? 0}%`, 'Accuracy']} />
-                </RadarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* ═══ RECENT ATTEMPTS TABLE ═══════════════════════ */}
-        <Card className="border-0 shadow-md">
-          <CardHeader>
-            <CardTitle className="text-xl">📋 All Attempts History</CardTitle>
-            <CardDescription>Tumhare sare tests ka record</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-gray-50 text-gray-600">
-                    <th className="text-left p-3 font-semibold">#</th>
-                    <th className="text-left p-3 font-semibold">Test</th>
-                    <th className="text-center p-3 font-semibold">Score</th>
-                    <th className="text-center p-3 font-semibold">✅</th>
-                    <th className="text-center p-3 font-semibold">❌</th>
-                    <th className="text-center p-3 font-semibold">⏭️</th>
-                    <th className="text-left p-3 font-semibold">Date</th>
-                    <th className="text-center p-3 font-semibold">Grade</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...attempts].reverse().map((attempt, idx) => (
-                    <tr
-                      key={attempt._id}
-                      className="border-b hover:bg-indigo-50 transition-colors"
-                    >
-                      <td className="p-3 text-gray-400 font-mono">{idx + 1}</td>
-                      <td className="p-3">
-                        <p className="font-medium text-gray-800 truncate max-w-[180px]">
-                          {attempt.title}
-                        </p>
-                      </td>
-                      <td className="p-3 text-center">
-                        <span className={`font-black text-lg
-                          ${attempt.score >= 80 ? 'text-green-600' :
-                            attempt.score >= 60 ? 'text-blue-600'  :
-                            attempt.score >= 40 ? 'text-yellow-600': 'text-red-500'}`}>
-                          {attempt.score}%
-                        </span>
-                      </td>
-                      <td className="p-3 text-center text-green-600 font-semibold">
-                        {attempt.correctCount}
-                      </td>
-                      <td className="p-3 text-center text-red-500 font-semibold">
-                        {attempt.incorrectCount}
-                      </td>
-                      <td className="p-3 text-center text-gray-400 font-semibold">
-                        {attempt.skippedCount}
-                      </td>
-                      <td className="p-3 text-gray-500 text-xs">
-                        {new Date(attempt.createdAt).toLocaleDateString('en-IN', {
-                          day: 'numeric', month: 'short', year: '2-digit'
-                        })}
-                      </td>
-                      <td className="p-3 text-center">
-                        <Badge className={
-                          attempt.score >= 80 ? 'bg-green-100 text-green-700'  :
-                          attempt.score >= 60 ? 'bg-blue-100 text-blue-700'    :
-                          attempt.score >= 40 ? 'bg-yellow-100 text-yellow-700':
-                          'bg-red-100 text-red-700'
-                        }>
-                          {attempt.score >= 80 ? '🌟 Excellent' :
-                           attempt.score >= 60 ? '👍 Good'      :
-                           attempt.score >= 40 ? '📈 Average'   : '💪 Practice'}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                );
+              })}
             </div>
-          </CardContent>
-        </Card>
+          ) : (
+            <p className="text-white/20 text-sm font-inter">No topic data available yet.</p>
+          )}
+        </NeonCard>
 
-        {/* ═══ ACTION BUTTONS ══════════════════════════════ */}
-        <div className="flex gap-3 pb-8">
-          <Button
-            onClick={() => navigate('/test-setup')}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold flex-1"
-          >
-            🚀 Naya Test Do
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => navigate('/dashboard')}
-            className="flex-1"
-          >
-            🏠 Dashboard
-          </Button>
+        {/* Radar */}
+        <NeonCard variant="magenta" padding="p-5" className="animate-fade-up">
+          <h2 className="font-inter font-semibold text-white mb-4">Skills Radar</h2>
+          <ResponsiveContainer width="100%" height={200}>
+            <RadarChart data={radarData}>
+              <PolarGrid stroke="rgba(255,255,255,0.06)" />
+              <PolarAngleAxis dataKey="subject" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
+              <Radar name="Score" dataKey="value" stroke="#FF00AA" fill="#FF00AA" fillOpacity={0.15}
+                strokeWidth={2} style={{ filter: 'drop-shadow(0 0 4px rgba(255,0,170,0.6))' }} />
+            </RadarChart>
+          </ResponsiveContainer>
+        </NeonCard>
+      </div>
+
+      {/* ── AI Insights ────────────────────────────────────── */}
+      <NeonCard variant="violet" padding="p-6" className="animate-fade-up">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-neon-violet/15 border border-neon-violet/30 flex items-center justify-center flex-shrink-0 animate-float">
+            <Brain size={22} className="text-neon-violet" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              <p className="font-orbitron text-sm font-bold text-neon-violet">AI NEURAL INSIGHTS</p>
+              <span className="text-[10px] px-1.5 py-0.5 bg-neon-violet/20 border border-neon-violet/30 rounded-full text-neon-violet font-mono-code animate-neon-pulse">
+                LIVE
+              </span>
+            </div>
+            <p className="text-white/60 text-sm font-inter leading-relaxed mb-3">{aiInsight}</p>
+            <div className="flex gap-2 flex-wrap">
+              {avgScore < 60 && (
+                <span className="text-xs px-2.5 py-1 rounded-full bg-neon-cyan/10 border border-neon-cyan/25 text-neon-cyan font-inter">
+                  💡 Practice daily basics
+                </span>
+              )}
+              {bestScore < 80 && (
+                <span className="text-xs px-2.5 py-1 rounded-full bg-neon-amber/10 border border-neon-amber/25 text-neon-amber font-inter">
+                  ⚡ Attempt harder tests
+                </span>
+              )}
+              <span className="text-xs px-2.5 py-1 rounded-full bg-neon-violet/10 border border-neon-violet/25 text-neon-violet font-inter">
+                🎯 {attempts.length} sessions analyzed
+              </span>
+            </div>
+          </div>
+          <Zap size={16} className="text-neon-violet/40 flex-shrink-0 animate-neon-pulse" />
         </div>
-
-      </main>
-    </div>
+      </NeonCard>
+    </AppLayout>
   );
 };
 

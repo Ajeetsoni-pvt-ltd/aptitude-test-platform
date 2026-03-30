@@ -1,45 +1,110 @@
-// frontend/src/pages/TestPage.tsx
-// ─────────────────────────────────────────────────────────────
-// Test Page — Full-screen exam environment
-// Features: Timer, Questions, Options, Navigator, Anti-cheat
-// ─────────────────────────────────────────────────────────────
+// src/pages/TestPage.tsx
+// Futuristic full-screen test interface
 
 import { useState, useCallback, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import useFullscreen  from '@/hooks/useFullscreen';
-import useAntiCheat   from '@/hooks/useAntiCheat';
-import useTimer       from '@/hooks/useTimer';
+import useFullscreen from '@/hooks/useFullscreen';
+import useAntiCheat  from '@/hooks/useAntiCheat';
+import useTimer      from '@/hooks/useTimer';
 import { submitTestApi } from '@/api/testApi';
 import type { Question } from '@/types';
-import { Button } from '@/components/ui/button';
-import { Badge }  from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import HoloButton from '@/components/ui/HoloButton';
+import ProgressRing from '@/components/ui/ProgressRing';
+import { ChevronLeft, ChevronRight, Send, AlertTriangle, Zap, Maximize, Minimize } from 'lucide-react';
 
-// ─── Answer Map Type ───────────────────────────────────────────
-// { questionId: selectedAnswer }
 type AnswerMap = Record<string, string>;
 
-// ─── Question Navigator Button ─────────────────────────────────
-const NavButton = ({
-  index, isCurrent, isAnswered, onClick,
-}: {
+// ── Question navigator button ───────────────────────────────────
+const NavBtn = ({ index, isCurrent, isAnswered, onClick }: {
   index: number; isCurrent: boolean; isAnswered: boolean; onClick: () => void;
 }) => (
   <button
     onClick={onClick}
-    className={`w-9 h-9 rounded-lg text-sm font-bold transition-all border-2
-      ${isCurrent  ? 'bg-indigo-600 text-white border-indigo-600 scale-110 shadow-md' :
-        isAnswered ? 'bg-green-100 text-green-700 border-green-400' :
-                     'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'}`}
+    className={cn(
+      'w-9 h-9 rounded-lg text-xs font-bold font-orbitron transition-all duration-200 border',
+      isCurrent  && 'bg-neon-cyan text-cyber-black border-neon-cyan shadow-[0_0_12px_rgba(0,245,255,0.6)] scale-110',
+      isAnswered && !isCurrent && 'bg-neon-green/15 text-neon-green border-neon-green/40',
+      !isCurrent && !isAnswered && 'bg-white/[0.03] text-white/30 border-white/8 hover:border-white/25 hover:text-white/60'
+    )}
   >
     {index + 1}
   </button>
 );
 
-const TestPage = () => {
-  const navigate  = useNavigate();
-  const location  = useLocation();
+// ── Pre-start screen ────────────────────────────────────────────
+const PreScreen = ({ title, questionCount, totalTime, onStart }: {
+  title: string; questionCount: number; totalTime: number; onStart: () => void;
+}) => (
+  <div className="min-h-screen bg-cyber-black relative flex items-center justify-center p-4 overflow-hidden">
+    <div className="pointer-events-none absolute inset-0">
+      <div className="absolute inset-0 cyber-grid opacity-30" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full opacity-[0.06]"
+        style={{ background: 'radial-gradient(circle, #00F5FF, transparent 65%)' }} />
+    </div>
 
-  // ─── Data from TestSetupPage (via navigate state) ──────────
+    <div className="relative z-10 w-full max-w-md text-center animate-fade-up">
+      <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-6
+        bg-gradient-to-br from-neon-cyan/15 to-neon-violet/15
+        border border-neon-cyan/30 shadow-[0_0_40px_rgba(0,245,255,0.2)] animate-float">
+        <Zap size={36} className="text-neon-cyan" />
+      </div>
+
+      <h1 className="font-orbitron text-2xl font-bold text-white mb-2 tracking-wide">{title}</h1>
+      <p className="text-white/30 text-sm font-inter mb-2">
+        {questionCount} Neural Challenges · {totalTime / 60} Minutes
+      </p>
+
+      <div className="flex justify-center gap-8 my-6">
+        {[
+          { label: 'Questions', value: questionCount, color: 'text-neon-cyan' },
+          { label: 'Minutes',   value: totalTime / 60, color: 'text-neon-amber' },
+          { label: 'Points',    value: questionCount,  color: 'text-neon-green' },
+        ].map((s) => (
+          <div key={s.label} className="text-center">
+            <p className={cn('font-orbitron text-3xl font-bold', s.color)}>{s.value}</p>
+            <p className="text-white/25 text-xs font-inter mt-0.5">{s.label}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="glass-card rounded-xl p-4 border border-neon-amber/15 mb-6 text-left">
+        <p className="text-neon-amber text-xs font-semibold mb-2 flex items-center gap-1.5">
+          <AlertTriangle size={12} /> Neural Protocol
+        </p>
+        <ul className="space-y-1.5 text-white/35 text-xs font-inter">
+          {[
+            'Test launches in fullscreen mode',
+            'Tab switching is detected and logged',
+            'Auto-submits when time expires',
+            'Session cannot be retaken',
+          ].map((r) => (
+            <li key={r} className="flex items-center gap-2">
+              <span className="text-neon-amber/50">▸</span> {r}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <HoloButton
+        variant="cyan"
+        size="xl"
+        fullWidth
+        onClick={onStart}
+        className="font-orbitron tracking-widest"
+        icon={<Maximize size={18} />}
+      >
+        ENTER NEURAL TEST
+      </HoloButton>
+    </div>
+  </div>
+);
+
+// ── Main component ─────────────────────────────────────────────
+const TestPage = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const state = location.state as {
     attemptId:      string;
     questions:      Question[];
@@ -48,349 +113,297 @@ const TestPage = () => {
     totalTime:      number;
   } | null;
 
-  // ─── Agar direct URL pe aaya (state nahi hai) ─────────────
   useEffect(() => {
-    if (!state?.attemptId) {
-      navigate('/test-setup', { replace: true });
-    }
+    if (!state?.attemptId) navigate('/test-setup', { replace: true });
   }, [state, navigate]);
 
   if (!state?.attemptId) return null;
 
-  const { attemptId, questions, title, totalTime } = state;
-
   return (
     <TestContent
-      attemptId={attemptId}
-      questions={questions}
-      title={title}
-      totalTime={totalTime}
+      attemptId={state.attemptId}
+      questions={state.questions}
+      title={state.title}
+      totalTime={state.totalTime}
     />
   );
 };
 
-// ─── Alag component — hooks ko safely use karne ke liye ───────
 const TestContent = ({
   attemptId, questions, title, totalTime,
 }: {
-  attemptId: string;
-  questions: Question[];
-  title: string;
-  totalTime: number;
+  attemptId: string; questions: Question[]; title: string; totalTime: number;
 }) => {
   const navigate = useNavigate();
-
-  // ─── Hooks ─────────────────────────────────────────────────
   const { isFullscreen, enterFullscreen, exitFullscreen } = useFullscreen();
-  const [isTestStarted, setIsTestStarted] = useState(false);
+  const [started,     setStarted]     = useState(false);
+  const [currentIdx,  setCurrentIdx]  = useState(0);
+  const [answers,     setAnswers]     = useState<AnswerMap>({});
+  const [submitting,  setSubmitting]  = useState(false);
 
   const { warningCount, isWarningVisible, lastWarning, dismissWarning } =
-    useAntiCheat(isTestStarted);
+    useAntiCheat(started);
 
-  // ─── Test State ────────────────────────────────────────────
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers]           = useState<AnswerMap>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // ─── Submit Handler (useCallback — timer se safe reference) ─
   const handleSubmit = useCallback(
-    async (isAutoSubmit = false) => {
-      if (isSubmitting) return;
-      setIsSubmitting(true);
-
-      // Fullscreen exit karo before navigate
+    async (auto = false) => {
+      if (submitting) return;
+      setSubmitting(true);
       await exitFullscreen();
-
       try {
-        // Answers array banao
         const answersArray = questions.map((q) => ({
           questionId:     q._id,
           selectedAnswer: answers[q._id] || '',
-          timeSpent:      Math.round(totalTime / questions.length), // Average
+          timeSpent:      Math.round(totalTime / questions.length),
         }));
-
-        const response = await submitTestApi(attemptId, {
-          answers: answersArray,
-          totalTime,
-        });
-
-        if (response.success && response.data) {
-          navigate('/result', {
-            state: {
-              result: response.data,
-              title,
-              isAutoSubmit,
-            },
-            replace: true,
-          });
+        const res = await submitTestApi(attemptId, { answers: answersArray, totalTime });
+        if (res.success && res.data) {
+          navigate('/result', { state: { result: res.data, title, isAutoSubmit: auto }, replace: true });
         }
-      } catch (err) {
-        console.error('Submit error:', err);
-        setIsSubmitting(false);
-      }
+      } catch { setSubmitting(false); }
     },
-    [answers, attemptId, exitFullscreen, isSubmitting, navigate, questions, title, totalTime]
+    [answers, attemptId, exitFullscreen, submitting, navigate, questions, title, totalTime]
   );
 
-  // ─── Timer — time up hone par auto submit ─────────────────
-  const handleTimeUp = useCallback(() => {
-    handleSubmit(true);
-  }, [handleSubmit]);
+  const { formattedTime, timeLeft } = useTimer(totalTime, () => handleSubmit(true));
 
-  const { formattedTime, timeLeft } = useTimer(
-    isTestStarted ? totalTime : totalTime,
-    handleTimeUp
-  );
+  const q            = questions[currentIdx];
+  const answeredCount = Object.keys(answers).length;
+  const progress      = Math.round((answeredCount / questions.length) * 100);
+  const isTimeCrit    = timeLeft <= 60;
+  const letters       = ['A', 'B', 'C', 'D', 'E'];
 
-  // ─── Option Select ─────────────────────────────────────────
-  const handleSelectAnswer = (questionId: string, option: string) => {
-    setAnswers((prev) => ({ ...prev, [questionId]: option }));
-  };
-
-  const currentQuestion = questions[currentIndex];
-  const answeredCount   = Object.keys(answers).length;
-  const skippedCount    = questions.length - answeredCount;
-  const isTimeCritical  = timeLeft <= 60; // Last 1 minute
-
-  // ─── PRE-SCREEN: Test shuru karne se pehle ─────────────────
-  if (!isTestStarted) {
+  if (!started) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-600 to-purple-700 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8 text-center">
-          <div className="text-6xl mb-4">🎯</div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">{title}</h1>
-          <p className="text-gray-500 mb-6">
-            {questions.length} questions • {totalTime / 60} minutes
-          </p>
-
-          <div className="bg-amber-50 rounded-xl p-4 text-left mb-6 text-sm space-y-2 border border-amber-200">
-            <p className="font-semibold text-amber-800">⚠️ Test shuru karne se pehle:</p>
-            <p className="text-amber-700">🖥️ Test fullscreen mode mein khulega</p>
-            <p className="text-amber-700">🚫 Tab switch karne par warning milegi</p>
-            <p className="text-amber-700">⏱️ Timer shuru hote hi ruk nahi sakta</p>
-            <p className="text-amber-700">✅ Sab ready hai? Toh Start karo!</p>
-          </div>
-
-          <Button
-            onClick={async () => {
-              await enterFullscreen();
-              setIsTestStarted(true);
-            }}
-            className="w-full h-12 text-lg font-bold bg-indigo-600 hover:bg-indigo-700 text-white"
-          >
-            🚀 Test Shuru Karo (Fullscreen)
-          </Button>
-        </div>
-      </div>
+      <PreScreen
+        title={title}
+        questionCount={questions.length}
+        totalTime={totalTime}
+        onStart={async () => { await enterFullscreen(); setStarted(true); }}
+      />
     );
   }
 
-  // ─── MAIN TEST UI ──────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col">
+    <div className="min-h-screen bg-cyber-black flex flex-col overflow-hidden">
 
-      {/* ═══ TOP BAR ════════════════════════════════════════ */}
-      <header className={`px-4 py-3 flex items-center justify-between sticky top-0 z-20 shadow-md
-        ${isTimeCritical ? 'bg-red-600' : 'bg-indigo-700'} text-white transition-colors`}>
-
-        <div className="flex items-center gap-3">
-          <span className="text-lg">🎯</span>
-          <span className="font-semibold hidden sm:block truncate max-w-xs">{title}</span>
-        </div>
-
-        {/* Timer */}
-        <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full font-mono text-xl font-bold
-          ${isTimeCritical ? 'bg-red-800 animate-pulse' : 'bg-indigo-900'}`}>
-          ⏱️ {formattedTime}
-        </div>
-
-        {/* Progress */}
-        <div className="flex items-center gap-3 text-sm">
-          <span className="hidden sm:block">
-            {currentIndex + 1} / {questions.length}
-          </span>
-          {warningCount > 0 && (
-            <Badge className="bg-red-500 text-white animate-pulse">
-              ⚠️ {warningCount} Warning
-            </Badge>
-          )}
-          <Button
-            onClick={() => handleSubmit(false)}
-            disabled={isSubmitting}
-            size="sm"
-            className="bg-green-500 hover:bg-green-600 text-white font-bold"
-          >
-            {isSubmitting ? '⏳ Submitting...' : '✅ Submit'}
-          </Button>
-        </div>
-      </header>
-
-      {/* ═══ ANTI-CHEAT WARNING POPUP ══════════════════════ */}
+      {/* ── Anti-cheat warning ────────────────────────────── */}
       {isWarningVisible && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full text-center shadow-2xl">
-            <div className="text-5xl mb-3">🚨</div>
-            <h2 className="text-xl font-bold text-red-600 mb-2">Warning!</h2>
-            <p className="text-gray-700 mb-2">{lastWarning?.message}</p>
-            <p className="text-gray-500 text-sm mb-4">
-              Warnings: {warningCount}/3
-              {warningCount >= 3 && ' — Aur warnings pe auto-submit ho sakta hai!'}
+        <div className="fixed inset-0 z-[60] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+          <div className="glass-strong rounded-2xl border border-neon-red/40 shadow-[0_0_40px_rgba(255,51,102,0.3)] p-8 max-w-sm w-full text-center">
+            <div className="w-16 h-16 rounded-2xl bg-neon-red/15 border border-neon-red/30 flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle size={32} className="text-neon-red" />
+            </div>
+            <h2 className="font-orbitron text-lg font-bold text-neon-red mb-2">Violation Detected</h2>
+            <p className="text-white/60 text-sm font-inter mb-2">{lastWarning?.message}</p>
+            <p className="text-neon-red/60 text-xs font-mono-code mb-6">
+              Warning {warningCount}/3 {warningCount >= 3 && '— Further violations risk auto-submit'}
             </p>
-            <Button
-              onClick={dismissWarning}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-8"
-            >
-              Samajh Gaya — Test Continue Karo
-            </Button>
+            <HoloButton variant="danger" fullWidth onClick={dismissWarning}>
+              Acknowledged — Resume Test
+            </HoloButton>
           </div>
         </div>
       )}
 
-      {/* ═══ MAIN AREA ════════════════════════════════════ */}
-      <div className="flex flex-1 max-w-6xl mx-auto w-full p-4 gap-4">
+      {/* ── Top bar ───────────────────────────────────────── */}
+      <header className={cn(
+        'flex items-center justify-between px-4 sm:px-6 h-14 border-b flex-shrink-0 backdrop-blur-sm',
+        isTimeCrit
+          ? 'border-neon-red/30 bg-neon-red/5'
+          : 'border-white/5 bg-cyber-black/80'
+      )}>
+        <div className="flex items-center gap-3">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-neon-cyan to-neon-violet flex items-center justify-center flex-shrink-0">
+            <Zap size={13} className="text-cyber-black" />
+          </div>
+          <span className="font-orbitron text-sm font-bold text-white/70 hidden sm:block truncate max-w-xs">{title}</span>
+        </div>
 
-        {/* ─── LEFT: Question + Options ──────────────────── */}
-        <div className="flex-1">
-          <div className="bg-white rounded-2xl shadow-md p-6 min-h-[400px] flex flex-col">
+        {/* Timer */}
+        <div className={cn(
+          'flex items-center gap-2 px-4 py-1.5 rounded-full border font-orbitron text-lg font-bold tracking-widest transition-all duration-300',
+          isTimeCrit
+            ? 'bg-neon-red/15 border-neon-red/40 text-neon-red shadow-[0_0_20px_rgba(255,51,102,0.4)] animate-neon-pulse'
+            : 'bg-white/4 border-white/10 text-neon-cyan'
+        )}>
+          {formattedTime}
+        </div>
 
-            {/* Question Number + Difficulty */}
-            <div className="flex items-center justify-between mb-4">
-              <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200 text-sm px-3 py-1">
-                Question {currentIndex + 1} of {questions.length}
-              </Badge>
-              <Badge
-                className={
-                  currentQuestion.difficulty === 'easy'   ? 'bg-green-100 text-green-700'  :
-                  currentQuestion.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                  'bg-red-100 text-red-700'
-                }
-              >
-                {currentQuestion.difficulty}
-              </Badge>
+        <div className="flex items-center gap-3">
+          {warningCount > 0 && (
+            <span className="text-xs px-2 py-1 rounded-full bg-neon-red/15 border border-neon-red/30 text-neon-red font-mono-code animate-neon-pulse">
+              ⚠ {warningCount}
+            </span>
+          )}
+          <span className="text-white/30 text-xs font-mono-code hidden sm:block">
+            {currentIdx + 1}/{questions.length}
+          </span>
+          <button
+            onClick={isFullscreen ? exitFullscreen : enterFullscreen}
+            className="text-white/30 hover:text-white/60 transition-colors"
+          >
+            {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
+          </button>
+          <HoloButton
+            variant="cyan"
+            size="sm"
+            onClick={() => handleSubmit(false)}
+            loading={submitting}
+            icon={<Send size={13} />}
+          >
+            Submit
+          </HoloButton>
+        </div>
+      </header>
+
+      {/* ── Progress bar ──────────────────────────────────── */}
+      <div className="h-0.5 bg-white/5 flex-shrink-0">
+        <div
+          className="h-full bg-gradient-to-r from-neon-cyan to-neon-violet transition-all duration-500"
+          style={{ width: `${((currentIdx + 1) / questions.length) * 100}%`, boxShadow: '0 0 8px rgba(0,245,255,0.6)' }}
+        />
+      </div>
+
+      {/* ── Main test area ────────────────────────────────── */}
+      <div className="flex flex-1 overflow-hidden">
+
+        {/* Question panel */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+          <div className="max-w-2xl mx-auto">
+
+            {/* Q header */}
+            <div className="flex items-center justify-between mb-6 animate-fade-up">
+              <div className="flex items-center gap-2">
+                <span className="text-white/20 text-xs font-mono-code uppercase tracking-widest">Question</span>
+                <span className="font-orbitron text-2xl font-bold text-white">{currentIdx + 1}</span>
+                <span className="text-white/20 font-mono-code text-sm">/ {questions.length}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={cn(
+                  'text-xs px-2.5 py-1 rounded-full border font-inter font-medium capitalize',
+                  q.difficulty === 'easy'   && 'bg-neon-green/10 border-neon-green/30 text-neon-green',
+                  q.difficulty === 'medium' && 'bg-neon-amber/10 border-neon-amber/30 text-neon-amber',
+                  q.difficulty === 'hard'   && 'bg-neon-red/10 border-neon-red/30 text-neon-red',
+                )}>
+                  {q.difficulty}
+                </span>
+                {answers[q._id] && (
+                  <span className="text-xs px-2.5 py-1 rounded-full bg-neon-cyan/10 border border-neon-cyan/30 text-neon-cyan font-inter">
+                    Answered
+                  </span>
+                )}
+              </div>
             </div>
 
-            {/* Question Text */}
-            <p className="text-lg font-medium text-gray-800 mb-6 leading-relaxed flex-1">
-              {currentQuestion.questionText}
-            </p>
+            {/* Question text */}
+            <div className="glass-card rounded-2xl p-6 border border-white/6 mb-6 animate-fade-up" style={{ animationDelay: '0.1s' }}>
+              <p className="text-white/90 text-base sm:text-lg font-inter leading-relaxed">
+                {q.questionText}
+              </p>
+            </div>
 
             {/* Options */}
             <div className="space-y-3">
-              {currentQuestion.options.map((option, idx) => {
-                const letters    = ['A', 'B', 'C', 'D'];
-                const isSelected = answers[currentQuestion._id] === option;
+              {q.options.map((opt, i) => {
+                const selected = answers[q._id] === opt;
                 return (
                   <button
-                    key={idx}
-                    onClick={() => handleSelectAnswer(currentQuestion._id, option)}
-                    className={`w-full p-4 rounded-xl text-left flex items-center gap-3 border-2
-                      font-medium transition-all duration-150
-                      ${isSelected
-                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-md scale-[1.01]'
-                        : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-indigo-400 hover:bg-indigo-50'
-                      }`}
+                    key={i}
+                    onClick={() => setAnswers((prev) => ({ ...prev, [q._id]: opt }))}
+                    className={cn(
+                      'answer-option w-full flex items-center gap-4 text-left',
+                      'animate-fade-up',
+                      selected && 'selected'
+                    )}
+                    style={{ animationDelay: `${0.1 + i * 0.05}s` }}
                   >
-                    <span className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0
-                      ${isSelected ? 'bg-white text-indigo-600' : 'bg-indigo-100 text-indigo-600'}`}>
-                      {letters[idx]}
+                    <span className={cn(
+                      'w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold font-orbitron flex-shrink-0 transition-all duration-200',
+                      selected
+                        ? 'bg-neon-cyan text-cyber-black shadow-[0_0_10px_rgba(0,245,255,0.6)]'
+                        : 'bg-white/5 text-white/30 border border-white/8'
+                    )}>
+                      {letters[i]}
                     </span>
-                    {option}
+                    <span className={cn('font-inter text-sm transition-colors', selected ? 'text-neon-cyan' : 'text-white/70')}>
+                      {opt}
+                    </span>
                   </button>
                 );
               })}
             </div>
 
-            {/* Prev / Next Buttons */}
-            <div className="flex justify-between mt-6 pt-4 border-t border-gray-100">
-              <Button
-                variant="outline"
-                onClick={() => setCurrentIndex((p) => Math.max(0, p - 1))}
-                disabled={currentIndex === 0}
+            {/* Prev / Next */}
+            <div className="flex justify-between mt-8">
+              <HoloButton
+                variant="ghost"
+                size="md"
+                onClick={() => setCurrentIdx((p) => Math.max(0, p - 1))}
+                disabled={currentIdx === 0}
+                icon={<ChevronLeft size={16} />}
               >
-                ← Previous
-              </Button>
-              <span className="text-sm text-gray-400 self-center">
-                {answers[currentQuestion._id] ? '✅ Answered' : '⭕ Not answered'}
-              </span>
-              {currentIndex < questions.length - 1 ? (
-                <Button
-                  onClick={() => setCurrentIndex((p) => p + 1)}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                Previous
+              </HoloButton>
+              {currentIdx < questions.length - 1 ? (
+                <HoloButton
+                  variant="cyan"
+                  size="md"
+                  onClick={() => setCurrentIdx((p) => p + 1)}
+                  icon={<ChevronRight size={16} />}
                 >
-                  Next →
-                </Button>
+                  Next
+                </HoloButton>
               ) : (
-                <Button
+                <HoloButton
+                  variant="magenta"
+                  size="md"
                   onClick={() => handleSubmit(false)}
-                  disabled={isSubmitting}
-                  className="bg-green-600 hover:bg-green-700 text-white font-bold"
+                  loading={submitting}
+                  icon={<Send size={16} />}
                 >
-                  ✅ Submit Test
-                </Button>
+                  Submit Test
+                </HoloButton>
               )}
             </div>
           </div>
         </div>
 
-        {/* ─── RIGHT: Question Navigator ─────────────────── */}
-        <div className="w-52 flex-shrink-0 hidden lg:block">
-          <div className="bg-white rounded-2xl shadow-md p-4 sticky top-20">
-            <h3 className="font-bold text-gray-700 text-sm mb-3">
-              🗂️ Question Navigator
-            </h3>
+        {/* ── Right sidebar: Navigator ───────────────────── */}
+        <div className="hidden lg:flex flex-col gap-4 w-52 border-l border-white/5 p-4 overflow-y-auto flex-shrink-0">
 
-            {/* Grid of question buttons */}
-            <div className="grid grid-cols-4 gap-1.5 mb-4">
-              {questions.map((q, idx) => (
-                <NavButton
-                  key={q._id}
-                  index={idx}
-                  isCurrent={idx === currentIndex}
-                  isAnswered={!!answers[q._id]}
-                  onClick={() => setCurrentIndex(idx)}
-                />
-              ))}
-            </div>
+          {/* Ring */}
+          <div className="flex flex-col items-center gap-2 py-2">
+            <ProgressRing value={progress} size={80} strokeWidth={5} color="cyan" label="Done" />
+            <p className="text-white/25 text-xs font-inter">{answeredCount}/{questions.length} answered</p>
+          </div>
 
-            {/* Legend */}
-            <div className="space-y-1.5 text-xs text-gray-500 border-t pt-3">
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-indigo-600"></div>
-                <span>Current</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-green-100 border-2 border-green-400"></div>
-                <span>Answered ({answeredCount})</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded bg-white border-2 border-gray-200"></div>
-                <span>Skipped ({skippedCount})</span>
-              </div>
-            </div>
+          <div className="divider-neon-cyan opacity-20" />
 
-            {/* Progress bar */}
-            <div className="mt-4">
-              <div className="flex justify-between text-xs text-gray-500 mb-1">
-                <span>Progress</span>
-                <span>{Math.round((answeredCount / questions.length) * 100)}%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-green-500 h-2 rounded-full transition-all"
-                  style={{ width: `${(answeredCount / questions.length) * 100}%` }}
-                />
-              </div>
-            </div>
+          {/* Question grid */}
+          <div className="grid grid-cols-4 gap-1.5">
+            {questions.map((_, i) => (
+              <NavBtn
+                key={i}
+                index={i}
+                isCurrent={i === currentIdx}
+                isAnswered={!!answers[questions[i]._id]}
+                onClick={() => setCurrentIdx(i)}
+              />
+            ))}
+          </div>
 
-            {/* Fullscreen toggle */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={isFullscreen ? exitFullscreen : enterFullscreen}
-              className="w-full mt-4 text-xs"
-            >
-              {isFullscreen ? '⊠ Exit Fullscreen' : '⊞ Fullscreen'}
-            </Button>
+          {/* Legend */}
+          <div className="space-y-1.5 text-xs font-inter">
+            {[
+              { color: 'bg-neon-cyan', label: 'Current' },
+              { color: 'bg-neon-green/30 border border-neon-green/50', label: `Answered (${answeredCount})` },
+              { color: 'bg-white/5 border border-white/10', label: `Skipped (${questions.length - answeredCount})` },
+            ].map((l) => (
+              <div key={l.label} className="flex items-center gap-2">
+                <div className={cn('w-3.5 h-3.5 rounded flex-shrink-0', l.color)} />
+                <span className="text-white/30">{l.label}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>

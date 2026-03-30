@@ -1,184 +1,172 @@
-// frontend/src/pages/LoginPage.tsx
-// ─────────────────────────────────────────────────────────────
-// Login Page — Email + Password form
-// Zustand authStore se login() action use karo
-// Success → /dashboard, Error → form mein dikhao
-// ─────────────────────────────────────────────────────────────
+// src/pages/LoginPage.tsx
+// Futuristic cyber-neon login with glassmorphism card + scanline overlay
 
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
-import { Button }   from '@/components/ui/button';
-import { Input }    from '@/components/ui/input';
-import { Label }    from '@/components/ui/label';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import HoloButton from '@/components/ui/HoloButton';
+import CyberInput from '@/components/ui/CyberInput';
+import { Mail, Lock, Eye, EyeOff, Zap, AlertCircle } from 'lucide-react';
 
 const LoginPage = () => {
   const navigate  = useNavigate();
   const { login, isLoading, error, clearError } = useAuthStore();
 
-  // ─── Local Form State ──────────────────────────────────────
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [formErrors, setFormErrors] = useState({ email: '', password: '' });
+  const [showPass, setShowPass]   = useState(false);
 
-  // ─── Input Change Handler ──────────────────────────────────
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    // User type kare toh error clear ho
     setFormErrors((prev) => ({ ...prev, [name]: '' }));
     clearError();
   };
 
-  // ─── Client-side Validation ────────────────────────────────
   const validate = (): boolean => {
     const errors = { email: '', password: '' };
-    let isValid = true;
-
+    let valid    = true;
     if (!formData.email.trim()) {
-      errors.email = 'Email required hai.';
-      isValid = false;
+      errors.email = 'Email is required.'; valid = false;
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      errors.email = 'Valid email daalo (example@gmail.com).';
-      isValid = false;
+      errors.email = 'Enter a valid email address.'; valid = false;
     }
-
     if (!formData.password) {
-      errors.password = 'Password required hai.';
-      isValid = false;
+      errors.password = 'Password is required.'; valid = false;
     } else if (formData.password.length < 6) {
-      errors.password = 'Password kam se kam 6 characters ka hona chahiye.';
-      isValid = false;
+      errors.password = 'Minimum 6 characters required.'; valid = false;
     }
-
     setFormErrors(errors);
-    return isValid;
+    return valid;
   };
 
-  // ─── Form Submit ───────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!validate()) return;
-
     try {
       await login({ email: formData.email, password: formData.password });
-      navigate('/dashboard', { replace: true }); // Success → Dashboard
-    } catch {
-      // Error Zustand store mein already save ho gaya → UI mein dikhega
-    }
+      navigate('/dashboard', { replace: true });
+    } catch { /* error in store */ }
   };
 
-  // ─── UI ────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-cyber-black relative flex items-center justify-center p-4 overflow-hidden">
 
-        {/* ─── Logo + Title ──────────────────────────────── */}
+      {/* ── Ambient glows ─────────────────────────────────── */}
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute top-[-15%] left-[-5%] w-[500px] h-[500px] rounded-full opacity-[0.12]"
+          style={{ background: 'radial-gradient(circle, #00F5FF, transparent 65%)' }} />
+        <div className="absolute bottom-[-15%] right-[-5%] w-[450px] h-[450px] rounded-full opacity-[0.10]"
+          style={{ background: 'radial-gradient(circle, #9D00FF, transparent 65%)' }} />
+        {/* Grid */}
+        <div className="absolute inset-0 cyber-grid opacity-40" />
+        {/* Scan line */}
+        <div className="absolute left-0 right-0 h-[2px] opacity-10 animate-scan"
+          style={{ background: 'linear-gradient(90deg, transparent, #00F5FF, transparent)' }} />
+      </div>
+
+      {/* ── Login Card ────────────────────────────────────── */}
+      <div className="relative z-10 w-full max-w-md animate-fade-up">
+
+        {/* Logo block */}
         <div className="text-center mb-8">
-          <div className="text-5xl mb-3">🎯</div>
-          <h1 className="text-3xl font-bold text-gray-900">Aptitude Test Platform</h1>
-          <p className="text-gray-500 mt-1">TCS NQT • CAT • Bank Exams</p>
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4
+            bg-gradient-to-br from-neon-cyan/20 to-neon-violet/20
+            border border-neon-cyan/30 shadow-[0_0_30px_rgba(0,245,255,0.3)]
+            animate-float">
+            <Zap size={28} className="text-neon-cyan" />
+          </div>
+          <h1 className="font-orbitron text-3xl font-bold text-white tracking-wider">
+            NEXUS
+          </h1>
+          <p className="text-white/35 text-sm font-inter mt-1 tracking-widest uppercase">
+            Aptitude Intelligence Platform
+          </p>
         </div>
 
-        {/* ─── Login Card ────────────────────────────────── */}
-        <Card className="shadow-xl border-0 bg-white/80 backdrop-blur">
-          <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-2xl font-bold text-center text-gray-800">
-              Welcome Back! 👋
-            </CardTitle>
-            <CardDescription className="text-center text-gray-500">
-              Apne account mein login karo
-            </CardDescription>
-          </CardHeader>
+        {/* Card */}
+        <div className="glass-strong rounded-2xl border border-white/8 shadow-glass-strong overflow-hidden">
 
-          <CardContent>
-            {/* ─── API Error Message ──────────────────────── */}
+          {/* Card header stripe */}
+          <div className="h-0.5 w-full" style={{ background: 'linear-gradient(90deg, #00F5FF, #9D00FF, #FF00AA)' }} />
+
+          <div className="p-8">
+            <h2 className="font-inter text-xl font-semibold text-white mb-1">Welcome back</h2>
+            <p className="text-white/35 text-sm font-inter mb-6">Sign in to your neural session</p>
+
+            {/* API Error */}
             {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
-                <span className="text-red-500 text-lg">⚠️</span>
-                <p className="text-red-600 text-sm">{error}</p>
+              <div className="mb-5 flex items-start gap-3 p-3.5 rounded-xl bg-neon-red/8 border border-neon-red/25 animate-fade-in">
+                <AlertCircle size={16} className="text-neon-red flex-shrink-0 mt-0.5" />
+                <p className="text-neon-red text-sm font-inter leading-snug">{error}</p>
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-
-              {/* ─── Email Field ──────────────────────────── */}
-              <div className="space-y-1.5">
-                <Label htmlFor="email" className="text-gray-700 font-medium">
-                  Email Address
-                </Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="ajeet@example.com"
-                  value={formData.email}
-                  onChange={handleChange}
-                  disabled={isLoading}
-                  className={`h-11 ${formErrors.email ? 'border-red-400 focus-visible:ring-red-400' : ''}`}
-                />
-                {formErrors.email && (
-                  <p className="text-red-500 text-xs mt-1">⚠ {formErrors.email}</p>
-                )}
-              </div>
-
-              {/* ─── Password Field ───────────────────────── */}
-              <div className="space-y-1.5">
-                <Label htmlFor="password" className="text-gray-700 font-medium">
-                  Password
-                </Label>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={formData.password}
-                  onChange={handleChange}
-                  disabled={isLoading}
-                  className={`h-11 ${formErrors.password ? 'border-red-400 focus-visible:ring-red-400' : ''}`}
-                />
-                {formErrors.password && (
-                  <p className="text-red-500 text-xs mt-1">⚠ {formErrors.password}</p>
-                )}
-              </div>
-
-              {/* ─── Submit Button ────────────────────────── */}
-              <Button
-                type="submit"
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <CyberInput
+                label="Email Address"
+                id="email"
+                name="email"
+                type="email"
+                placeholder="agent@nexus.io"
+                value={formData.email}
+                onChange={handleChange}
                 disabled={isLoading}
-                className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-base mt-2"
-              >
-                {isLoading ? (
-                  <span className="flex items-center gap-2">
-                    <span className="animate-spin text-lg">⏳</span>
-                    Login ho raha hai...
-                  </span>
-                ) : (
-                  '🔐 Login Karo'
-                )}
-              </Button>
-            </form>
-          </CardContent>
+                error={formErrors.email}
+                icon={<Mail size={16} />}
+              />
 
-          <CardFooter className="justify-center pb-6">
-            <p className="text-gray-500 text-sm">
-              Account nahi hai?{' '}
-              <Link
-                to="/register"
-                className="text-indigo-600 hover:text-indigo-800 font-semibold hover:underline"
+              <CyberInput
+                label="Password"
+                id="password"
+                name="password"
+                type={showPass ? 'text' : 'password'}
+                placeholder="••••••••••"
+                value={formData.password}
+                onChange={handleChange}
+                disabled={isLoading}
+                error={formErrors.password}
+                icon={<Lock size={16} />}
+                rightIcon={
+                  <button type="button" onClick={() => setShowPass((s) => !s)} className="text-white/30 hover:text-white/60 transition-colors">
+                    {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                }
+              />
+
+              <HoloButton
+                type="submit"
+                variant="cyan"
+                size="lg"
+                fullWidth
+                loading={isLoading}
+                className="mt-2 font-orbitron tracking-widest"
               >
-                Register karo →
+                INITIALIZE SESSION
+              </HoloButton>
+            </form>
+
+            {/* Divider */}
+            <div className="flex items-center gap-3 my-6">
+              <div className="flex-1 h-px bg-white/8" />
+              <span className="text-white/20 text-xs font-inter">or</span>
+              <div className="flex-1 h-px bg-white/8" />
+            </div>
+
+            {/* Register link */}
+            <p className="text-center text-white/35 text-sm font-inter">
+              New to Nexus?{' '}
+              <Link to="/register" className="text-neon-cyan hover:text-neon-cyan/80 font-semibold transition-colors hover:underline underline-offset-2">
+                Create account →
               </Link>
             </p>
-          </CardFooter>
-        </Card>
+          </div>
+        </div>
+
+        {/* Footer note */}
+        <p className="text-center text-white/15 text-xs font-inter mt-6 tracking-wider">
+          CLASSIFIED PLATFORM • AUTHORIZED ACCESS ONLY
+        </p>
       </div>
     </div>
   );
