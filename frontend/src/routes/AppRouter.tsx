@@ -20,6 +20,8 @@ import HistoryPage       from '@/pages/HistoryPage';
 import LeaderboardPage   from '@/pages/LeaderboardPage';
 import SettingsPage      from '@/pages/SettingsPage';
 import ProblemOfDayPage  from '@/pages/ProblemOfDayPage';
+import SolutionReviewPage from '@/pages/SolutionReviewPage';
+import NotificationsPage from '@/pages/NotificationsPage';
 
 // ── Admin pages ───────────────────────────────────────────────────
 import AdminDashboard      from '@/pages/admin/AdminDashboard';
@@ -52,10 +54,12 @@ const AppRouter = () => {
         <Route path="/result"          element={<ResultPage />} />
         <Route path="/analysis"        element={<AnalysisPage />} />
         <Route path="/profile"         element={<ProfilePage />} />
+        <Route path="/solutions/:attemptId" element={<SolutionReviewPage />} />
         <Route path="/history"         element={<HistoryPage />} />
         <Route path="/leaderboard"     element={<LeaderboardPage />} />
         <Route path="/settings"        element={<SettingsPage />} />
         <Route path="/problem-of-day"  element={<ProblemOfDayPage />} />
+        <Route path="/notifications"   element={<NotificationsPage />} />
       </Route>
 
       {/* ── Admin Only Routes ──────────────────────────────────── */}

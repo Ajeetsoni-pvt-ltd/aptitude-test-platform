@@ -26,7 +26,7 @@ interface UseFaceDetectionReturn {
   isFaceDetected:  boolean;
   isLoading:       boolean;
   cameraError:     string | null;
-  startCamera:     () => Promise<void>;
+  startCamera:     () => Promise<boolean>;
   stopCamera:      () => void;
   isActive:        boolean;
 }
@@ -58,8 +58,8 @@ const useFaceDetection = (enabled: boolean): UseFaceDetectionReturn => {
     setIsFaceDetected(facePresent);
   }, []);
 
-  const startCamera = useCallback(async () => {
-    if (!enabled) return;
+  const startCamera = useCallback(async (): Promise<boolean> => {
+    if (!enabled) return false;
     setIsLoading(true);
     setCameraError(null);
 
@@ -99,6 +99,8 @@ const useFaceDetection = (enabled: boolean): UseFaceDetectionReturn => {
       // };
       // detectLoop();
 
+      return true;
+
     } catch (err) {
       const error = err as Error;
       if (error.name === 'NotAllowedError') {
@@ -109,6 +111,7 @@ const useFaceDetection = (enabled: boolean): UseFaceDetectionReturn => {
         setCameraError('Camera failed to start: ' + error.message);
       }
       setIsActive(false);
+      return false;
     } finally {
       setIsLoading(false);
     }

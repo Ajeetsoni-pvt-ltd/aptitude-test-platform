@@ -40,6 +40,22 @@ const NavBtn = ({ index, isCurrent, isAnswered, onClick }: {
   </button>
 );
 
+// ── Mobile block screen ──────────────────────────────────────────
+const MobileBlockScreen = () => (
+  <div className="min-h-screen bg-cyber-black flex flex-col items-center justify-center p-6 text-center">
+    <div className="w-20 h-20 rounded-2xl bg-neon-red/15 border border-neon-red/30 flex items-center justify-center mb-6 animate-float">
+      <AlertTriangle size={36} className="text-neon-red" />
+    </div>
+    <h1 className="font-orbitron text-2xl font-bold text-white mb-3">Desktop Required</h1>
+    <p className="text-white/60 text-sm font-inter max-w-sm leading-relaxed mb-6">
+      This test is only available on Desktop or Laptop (PC). The advanced proctoring and neural interface are not compatible with mobile devices.
+    </p>
+    <p className="text-neon-red/80 font-mono-code text-xs uppercase tracking-widest p-3 border border-neon-red/20 bg-neon-red/5 rounded-lg inline-block">
+      Please switch to a desktop or PC to take the test.
+    </p>
+  </div>
+);
+
 // ── Pre-start screen ─────────────────────────────────────────────
 const PreScreen = ({
   title, questionCount, totalTime, isProctored, onStart,
@@ -200,7 +216,7 @@ const TestContent = ({
   const {
     videoRef, isFaceDetected, isActive: cameraActive,
     cameraError, isLoading: cameraLoading, startCamera, stopCamera,
-  } = useFaceDetection(isProctored && started);
+  } = useFaceDetection(isProctored);
 
   // ── Anti-Cheat ───────────────────────────────────────────────
   const handleAutoSubmit = useCallback(() => {
@@ -246,10 +262,20 @@ const TestContent = ({
   const handleStart = async () => {
     if (isProctored) {
       await enterFullscreen();
-      await startCamera();
+      const cameraStarted = await startCamera();
+      if (!cameraStarted) {
+        // If camera failed, exit fullscreen and abort
+        await exitFullscreen();
+        return; // cameraError will show up, can't continue
+      }
     }
     setStarted(true);
   };
+
+  const isMobile = window.innerWidth < 1024 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  if (isMobile) {
+    return <MobileBlockScreen />;
+  }
 
   const q             = questions[currentIdx];
   const answeredCount = Object.keys(answers).length;
@@ -259,13 +285,21 @@ const TestContent = ({
 
   if (!started) {
     return (
-      <PreScreen
-        title={title}
-        questionCount={questions.length}
-        totalTime={totalTime}
-        isProctored={isProctored}
-        onStart={handleStart}
-      />
+      <div className="relative">
+        <PreScreen
+          title={title}
+          questionCount={questions.length}
+          totalTime={totalTime}
+          isProctored={isProctored}
+          onStart={handleStart}
+        />
+        {cameraError && (
+          <div className="fixed top-10 left-1/2 -translate-x-1/2 z-50 bg-neon-red/10 border border-neon-red/50 text-neon-red px-6 py-3 rounded-xl shadow-[0_0_30px_rgba(255,51,102,0.3)] backdrop-blur-md animate-fade-in flex items-center gap-3 w-[90%] max-w-md">
+            <AlertTriangle size={20} className="flex-shrink-0" />
+            <p className="text-sm font-inter font-medium leading-snug">{cameraError}</p>
+          </div>
+        )}
+      </div>
     );
   }
 

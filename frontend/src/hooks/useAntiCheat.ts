@@ -127,12 +127,40 @@ const useAntiCheat = ({
 
     const handleFullscreenChange = () => {
       if (!document.fullscreenElement && isActiveRef.current) {
-        addWarning('FULLSCREEN_EXIT', '⚠️ Fullscreen exited! Please return to fullscreen mode.');
+        addWarning('FULLSCREEN_EXIT', '🚨 Fullscreen exited! Test is being auto-submitted.');
+        if (onAutoSubmitRef.current) {
+          setTimeout(() => {
+            if (isActiveRef.current) onAutoSubmitRef.current?.();
+          }, 1500); // 1.5 seconds so they can see why it happened
+        }
       }
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, [isTestActive, addWarning]);
+
+  // ── Browser Back Button Blocking ─────────────────────────────
+  useEffect(() => {
+    if (!isTestActive || modeRef.current !== 'proctored') return;
+
+    // Push state so we have something to pop
+    window.history.pushState(null, '', window.location.href);
+
+    const handlePopState = () => {
+      // User pressed back button
+      addWarning('WINDOW_BLUR', '🚨 Back button detected! Test is being auto-submitted.');
+      if (onAutoSubmitRef.current) {
+        setTimeout(() => {
+          if (isActiveRef.current) onAutoSubmitRef.current?.();
+        }, 1500);
+      }
+      // Re-push state to keep them on page while it submits
+      window.history.pushState(null, '', window.location.href);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, [isTestActive, addWarning]);
 
   // ── Keyboard Shortcut Blocking ────────────────────────────────

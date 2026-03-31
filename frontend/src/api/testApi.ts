@@ -52,3 +52,15 @@ export const getAttemptByIdApi = async (
   const response = await apiClient.get(`/tests/${attemptId}`);
   return response.data;
 };
+// ─── Start Scheduled Test ─────────────────────────────────
+export const startScheduledTestApi = async (
+  scheduledTestId: string
+): Promise<ApiResponse<{
+  attemptId: string;
+  title: string;
+  totalQuestions: number;
+  questions: Question[];
+}>> => {
+  const response = await apiClient.post(`/scheduled-tests/${scheduledTestId}/start`);
+  return response.data;
+};

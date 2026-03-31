@@ -1,7 +1,7 @@
 // src/pages/admin/CreateTestPage.tsx
 // Admin: Create & schedule a full-length test with student assignment and time lock
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import AdminLayout from '@/components/AdminLayout';
 import NeonCard from '@/components/ui/NeonCard';
 import HoloButton from '@/components/ui/HoloButton';
@@ -12,32 +12,32 @@ import {
   FileText, Shield,
 } from 'lucide-react';
 
-// ── Mock student list ─────────────────────────────────────────────
-const ALL_STUDENTS = [
-  { id: 's1',  name: 'Arjun Sharma',   email: 'arjun@example.com',  avatar: 'AS', batch: 'Batch A' },
-  { id: 's2',  name: 'Priya Nair',     email: 'priya@example.com',  avatar: 'PN', batch: 'Batch A' },
-  { id: 's3',  name: 'Rohan Mehta',    email: 'rohan@example.com',  avatar: 'RM', batch: 'Batch B' },
-  { id: 's4',  name: 'Kavya Singh',    email: 'kavya@example.com',  avatar: 'KS', batch: 'Batch B' },
-  { id: 's5',  name: 'Amit Patel',     email: 'amit@example.com',   avatar: 'AP', batch: 'Batch C' },
-  { id: 's6',  name: 'Sneha Reddy',    email: 'sneha@example.com',  avatar: 'SR', batch: 'Batch A' },
-  { id: 's7',  name: 'Vikram Joshi',   email: 'vikram@example.com', avatar: 'VJ', batch: 'Batch C' },
-  { id: 's8',  name: 'Ananya Kumar',   email: 'ananya@example.com', avatar: 'AK', batch: 'Batch B' },
-  { id: 's9',  name: 'Raj Verma',      email: 'raj@example.com',    avatar: 'RV', batch: 'Batch A' },
-  { id: 's10', name: 'Meera Pillai',   email: 'meera@example.com',  avatar: 'MP', batch: 'Batch C' },
-];
+import { getAllUsersApi, uploadQuestionsApi } from '@/api/adminApi';
+import { createScheduledTestApi, getAllScheduledTestsApi } from '@/api/scheduledApi';
+import type { User } from '@/types';
 
-// Mock scheduled tests
-const MOCK_SCHEDULED = [
-  { id: 'st1', title: 'Quantitative Aptitude — Final Mock', students: 8, startTime: new Date(Date.now() + 3600_000 * 2), status: 'locked'    },
-  { id: 'st2', title: 'Logical Reasoning — Mid-Term Test',  students: 12, startTime: new Date(Date.now() - 1800_000),     status: 'live'     },
-  { id: 'st3', title: 'Verbal Ability — Quarterly Exam',    students: 20, startTime: new Date(Date.now() - 86400_000 * 3), status: 'completed' },
-];
+// Utility to generate avatars from names
+const getInitials = (name: string) => {
+  const parts = name.trim().split(' ');
+  if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  return name.substring(0, 2).toUpperCase();
+};
+
+interface StudentOption {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string;
+  batch: string;
+}
+
+
 
 type TestStatus = 'locked' | 'live' | 'completed';
 
-const getStatus = (startTime: Date): TestStatus => {
+const getStatus = (startTime: Date | string): TestStatus => {
   const now = Date.now();
-  const start = startTime.getTime();
+  const start = new Date(startTime).getTime();
   if (now < start)             return 'locked';
   if (now < start + 7200_000)  return 'live';
   return 'completed';
@@ -71,19 +71,72 @@ const CreateTestPage = () => {
   const [selectedStu,    setSelectedStu]    = useState<string[]>([]);
   const [stuSearch,      setStuSearch]      = useState('');
   const [uploadFile,     setUploadFile]     = useState<File | null>(null);
+  const [uploadedQuestionIds, setUploadedQuestionIds] = useState<string[]>([]);
   const [isSubmitting,   setIsSubmitting]   = useState(false);
   const [success,        setSuccess]        = useState(false);
   const [error,          setError]          = useState('');
 
-  // Mocked list as local state so we can append
-  const [scheduledTests, setScheduledTests] = useState(MOCK_SCHEDULED);
+  // Students state
+  const [allStudents,    setAllStudents]    = useState<StudentOption[]>([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+
+  // Fetch actual users on load
+  useEffect(() => {
+    const fetchUsers = async () => {
+      setIsLoadingUsers(true);
+      try {
+        // Fetch up to 1000 users for the test scheduling assign feature
+        const res = await getAllUsersApi(1, 1000);
+        if (res.success && res.data) {
+           const studentsOnly = res.data.users
+            .filter((u: User) => u.role === 'student')
+            .map((u: User) => ({
+              id: u._id,
+              name: u.name,
+              email: u.email,
+              avatar: getInitials(u.name || 'User'),
+              batch: 'Standard Batch' // Or map to actual batch if available in DB
+            }));
+           setAllStudents(studentsOnly);
+        }
+      } catch (err) {
+        console.error("Failed to load users", err);
+      } finally {
+        setIsLoadingUsers(false);
+      }
+    };
+    
+    // Fetch all admin scheduled tests
+    const fetchScheduled = async () => {
+      try {
+        const res = await getAllScheduledTestsApi();
+        if (res.success) {
+          setScheduledTests(res.data.map((t: any) => ({
+            id: t._id,
+            title: t.title,
+            students: t.assignedStudents.length,
+            startTime: new Date(t.startTime),
+            status: t.status,
+          })));
+        }
+      } catch (err) {
+        console.error("Failed to load scheduled tests");
+      }
+    };
+
+    fetchUsers();
+    fetchScheduled();
+  }, []);
+
+  // Use local state for scheduled table rendering
+  const [scheduledTests, setScheduledTests] = useState<any[]>([]);
 
   const filteredStudents = useMemo(() =>
-    ALL_STUDENTS.filter(s =>
+    allStudents.filter(s =>
       s.name.toLowerCase().includes(stuSearch.toLowerCase()) ||
       s.email.toLowerCase().includes(stuSearch.toLowerCase()) ||
       s.batch.toLowerCase().includes(stuSearch.toLowerCase())
-    ), [stuSearch]
+    ), [stuSearch, allStudents]
   );
 
   const toggleStudent = (id: string) => {
@@ -103,26 +156,74 @@ const CreateTestPage = () => {
     setError('');
     setIsSubmitting(true);
 
-    // Simulate API call
-    await new Promise(r => setTimeout(r, 1500));
+    try {
+      let questionIds: string[] = [];
 
-    const scheduled = new Date(`${startDate}T${startTime}`);
-    setScheduledTests(prev => [{
-      id: `st-${Date.now()}`,
-      title: testTitle,
-      students: selectedStu.length,
-      startTime: scheduled,
-      status: getStatus(scheduled),
-    }, ...prev]);
+      // Step 1: Upload file if selected and extract question IDs
+      if (uploadFile) {
+        try {
+          const uploadRes = await uploadQuestionsApi(uploadFile);
+          if (uploadRes.success && uploadRes.data?.questionIds) {
+            questionIds = uploadRes.data.questionIds;
+            setUploadedQuestionIds(questionIds);
+          } else {
+            setError('Questions uploaded but could not extract IDs. Please try again.');
+            setIsSubmitting(false);
+            return;
+          }
+        } catch (uploadErr: any) {
+          const msg = uploadErr?.response?.data?.message || 'Failed to upload file';
+          setError(msg);
+          setIsSubmitting(false);
+          return;
+        }
+      }
 
-    setSuccess(true);
-    setTestTitle('');
-    setSelectedStu([]);
-    setStartDate('');
-    setStartTime('');
-    setUploadFile(null);
-    setIsSubmitting(false);
-    setTimeout(() => setSuccess(false), 4000);
+      // Step 2: Create scheduled test with or without uploaded questions
+      const scheduled = new Date(`${startDate}T${startTime}`);
+      
+      const payload: any = {
+        title: testTitle,
+        topic: testTopic,
+        difficulty: testDifficulty,
+        questionCount: questionIds.length > 0 ? questionIds.length : questionCount,
+        timeLimit,
+        startTime: scheduled.toISOString(),
+        assignedStudents: selectedStu,
+      };
+
+      // Include custom questions if they were uploaded
+      if (questionIds.length > 0) {
+        payload.customQuestions = questionIds;
+      }
+
+      const res = await createScheduledTestApi(payload);
+
+      if (res.success) {
+        setScheduledTests(prev => [{
+          id: res.data._id || `st-${Date.now()}`,
+          title: testTitle,
+          students: selectedStu.length,
+          startTime: scheduled,
+          status: getStatus(scheduled),
+        }, ...prev]);
+
+        setSuccess(true);
+        setTestTitle('');
+        setSelectedStu([]);
+        setStartDate('');
+        setStartTime('');
+        setUploadFile(null);
+        setUploadedQuestionIds([]);
+        setTimeout(() => setSuccess(false), 4000);
+      } else {
+        setError(res.message || 'Failed to schedule test');
+      }
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err.message || 'Error occurred');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const now = new Date();
@@ -202,17 +303,32 @@ const CreateTestPage = () => {
                 {/* Questions + Time row */}
                 <div className="grid grid-cols-2 gap-4 mb-4">
                   <div>
-                    <label className="text-white/40 text-xs uppercase tracking-widest font-inter block mb-2">
-                      Questions ({questionCount})
+                    <label className="text-white/40 text-xs uppercase tracking-widest font-inter block mb-2 flex items-center gap-2">
+                      {uploadedQuestionIds.length > 0 ? (
+                        <>
+                          Questions <span className="text-neon-green">(Uploaded: {uploadedQuestionIds.length})</span>
+                        </>
+                      ) : (
+                        <>Questions ({questionCount})</>
+                      )}
                     </label>
-                    <input
-                      type="range" min={5} max={100} value={questionCount}
-                      onChange={e => setQuestionCount(Number(e.target.value))}
-                      className="w-full accent-cyan-400 cursor-pointer"
-                    />
-                    <div className="flex justify-between text-[10px] text-white/20 font-mono-code mt-1">
-                      <span>5</span><span className="text-neon-cyan font-bold">{questionCount}</span><span>100</span>
-                    </div>
+                    {uploadedQuestionIds.length > 0 ? (
+                      <div className="w-full p-3 rounded-lg bg-neon-green/10 border border-neon-green/30">
+                        <p className="text-neon-green text-sm font-inter font-semibold">{uploadedQuestionIds.length} Questions</p>
+                        <p className="text-neon-green/60 text-xs font-inter mt-1">All uploaded questions will be used</p>
+                      </div>
+                    ) : (
+                      <>
+                        <input
+                          type="range" min={5} max={100} value={questionCount}
+                          onChange={e => setQuestionCount(Number(e.target.value))}
+                          className="w-full accent-cyan-400 cursor-pointer"
+                        />
+                        <div className="flex justify-between text-[10px] text-white/20 font-mono-code mt-1">
+                          <span>5</span><span className="text-neon-cyan font-bold">{questionCount}</span><span>100</span>
+                        </div>
+                      </>
+                    )}
                   </div>
                   <div>
                     <label className="text-white/40 text-xs uppercase tracking-widest font-inter block mb-2">
@@ -244,12 +360,15 @@ const CreateTestPage = () => {
                     )}
                   >
                     {uploadFile ? (
-                      <div className="flex items-center justify-center gap-3">
-                        <CheckCircle2 size={20} className="text-neon-green" />
-                        <span className="text-neon-green text-sm font-inter">{uploadFile.name}</span>
-                        <button onClick={(e) => { e.stopPropagation(); setUploadFile(null); }} className="text-white/30 hover:text-neon-red">
-                          <X size={16} />
-                        </button>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-center gap-3">
+                          <CheckCircle2 size={20} className="text-neon-green" />
+                          <span className="text-neon-green text-sm font-inter">{uploadFile.name}</span>
+                          <button onClick={(e) => { e.stopPropagation(); setUploadFile(null); setUploadedQuestionIds([]); }} className="text-white/30 hover:text-neon-red">
+                            <X size={16} />
+                          </button>
+                        </div>
+                        <p className="text-neon-green/70 text-xs font-inter">Selected: {uploadFile.name} · Ready to upload on test creation</p>
                       </div>
                     ) : (
                       <>
@@ -266,6 +385,11 @@ const CreateTestPage = () => {
                       onChange={e => setUploadFile(e.target.files?.[0] ?? null)}
                     />
                   </div>
+                  {uploadedQuestionIds.length > 0 && (
+                    <div className="mt-3 p-3 rounded-lg bg-neon-cyan/10 border border-neon-cyan/30">
+                      <p className="text-neon-cyan text-xs font-inter font-semibold">✅ Uploaded: {uploadedQuestionIds.length} questions ready</p>
+                    </div>
+                  )}
                 </div>
               </NeonCard>
 
@@ -351,6 +475,18 @@ const CreateTestPage = () => {
                     </button>
                   )}
                 </div>
+
+                {isLoadingUsers && (
+                  <div className="flex justify-center items-center py-8">
+                     <div className="w-5 h-5 rounded-full border-2 border-neon-magenta border-t-transparent animate-spin" />
+                  </div>
+                )}
+                
+                {!isLoadingUsers && filteredStudents.length === 0 && (
+                   <div className="py-8 text-center text-white/30 text-sm font-inter">
+                     No students found.
+                   </div>
+                )}
 
                 {/* Student list */}
                 <div className="space-y-2 max-h-72 overflow-y-auto pr-1">

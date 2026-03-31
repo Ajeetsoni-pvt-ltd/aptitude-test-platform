@@ -4,8 +4,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
-import { getMyResultsApi } from '@/api/testApi';
+import { getMyResultsApi, startTestApi, startScheduledTestApi } from '@/api/testApi';
+import { getMyScheduledTestsApi } from '@/api/scheduledApi';
 import type { TestAttempt } from '@/types';
+import { cn } from '@/lib/utils';
 import AppLayout from '@/components/layout/AppLayout';
 import NeonCard from '@/components/ui/NeonCard';
 import StatCard from '@/components/ui/StatCard';
@@ -18,7 +20,7 @@ import {
 } from 'recharts';
 import {
   BookOpen, Trophy, Clock, TrendingUp, Plus, ArrowRight,
-  Zap, Target, ChevronRight, Star, Activity, Brain, Flame,
+  Zap, Target, ChevronRight, Star, Activity, Brain, Flame, Lock, Calendar
 } from 'lucide-react';
 
 // ── Custom chart tooltip ──────────────────────────────────────────
@@ -111,20 +113,58 @@ const DashboardPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [totalTests, setTotalTests] = useState(0);
 
+  // Scheduled tests and starting logic
+  const [scheduledTests, setScheduledTests] = useState<any[]>([]);
+  const [startingTestId, setStartingTestId] = useState<string | null>(null);
+
   useEffect(() => {
     const fetch = async () => {
       try {
         setIsLoading(true);
-        const res = await getMyResultsApi(1, 5);
-        if (res.success && res.data) {
-          setAttempts(res.data.attempts);
-          setTotalTests(res.data.pagination.totalAttempts);
+        const [resAttempts, resScheduled] = await Promise.all([
+          getMyResultsApi(1, 5),
+          getMyScheduledTestsApi()
+        ]);
+
+        if (resAttempts.success && resAttempts.data) {
+          setAttempts(resAttempts.data.attempts);
+          setTotalTests(resAttempts.data.pagination.totalAttempts);
+        }
+
+        if (resScheduled.success && resScheduled.data) {
+          setScheduledTests(resScheduled.data);
         }
       } catch { /* silent */ }
       finally { setIsLoading(false); }
     };
     fetch();
   }, []);
+
+  const handleStartScheduled = async (test: any) => {
+    if (test.status === 'locked' || startingTestId) return;
+    
+    setStartingTestId(test._id);
+    try {
+      const res = await startScheduledTestApi(test._id);
+
+      if (res.success && res.data) {
+        navigate('/test', {
+          state: {
+            attemptId: res.data.attemptId,
+            questions: res.data.questions,
+            title: res.data.title,
+            totalQuestions: res.data.totalQuestions,
+            totalTime: test.timeLimit * 60,
+            isProctored: true, // Force proctoring for admin scheduled tests
+          },
+        });
+      }
+    } catch (err) {
+      console.error("Failed to start scheduled test", err);
+    } finally {
+      setStartingTestId(null);
+    }
+  };
 
   const avgScore  = attempts.length ? Math.round(attempts.reduce((s, a) => s + a.score, 0) / attempts.length) : 0;
   const bestScore = attempts.length ? Math.max(...attempts.map((a) => a.score)) : 0;
@@ -306,6 +346,74 @@ const DashboardPage = () => {
 
       {/* ── Problem of the Day Card ─────────────────────────── */}
       <PotdCard navigate={navigate} />
+
+      {/* ── Scheduled / Upcoming Tests ─────────────────────── */}
+      {scheduledTests.length > 0 && (
+        <NeonCard variant="violet" className="animate-fade-up mb-8" padding="p-5">
+           <div className="flex items-center gap-2 mb-5">
+             <Calendar size={18} className="text-neon-violet" />
+             <h2 className="font-inter font-semibold text-white">Upcoming & Assigned Tests</h2>
+           </div>
+           
+           <div className="grid md:grid-cols-2 gap-4">
+             {scheduledTests.map(test => {
+               const isLocked = test.status === 'locked';
+               
+               return (
+                 <div key={test._id} className={cn(
+                   "p-4 rounded-xl border relative overflow-hidden group transition-all duration-300",
+                   isLocked ? "border-white/5 bg-white/[0.02]" : "border-neon-cyan/30 bg-neon-cyan/5 hover:border-neon-cyan/50 hover:bg-neon-cyan/10"
+                 )}>
+                   <div className="flex justify-between items-start mb-2">
+                     <p className="font-inter font-medium text-white/90 text-sm truncate pr-2 group-hover:text-white">{test.title}</p>
+                     
+                     {isLocked ? (
+                       <span className="flex-shrink-0 flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border border-neon-amber/30 text-neon-amber bg-neon-amber/5 font-mono-code">
+                         <Lock size={10} /> LOCKED
+                       </span>
+                     ) : test.status === 'live' ? (
+                       <span className="flex-shrink-0 flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border border-neon-green/30 text-neon-green bg-neon-green/5 font-mono-code animate-neon-pulse">
+                         <div className="w-1.5 h-1.5 rounded-full bg-neon-green" /> LIVE
+                       </span>
+                     ) : (
+                       <span className="flex-shrink-0 text-[10px] px-2 py-0.5 rounded-full border border-white/20 text-white/50 bg-white/5 font-mono-code">
+                         ENDED
+                       </span>
+                     )}
+                   </div>
+                   
+                   <p className="text-white/40 text-xs font-inter mb-4 line-clamp-1">{test.topic} · {test.questionCount} Questions · {test.timeLimit} Minutes</p>
+                   
+                   <div className="flex justify-between items-end">
+                     <div>
+                       <p className="text-[10px] text-white/30 uppercase tracking-wider font-inter">Scheduled For</p>
+                       <p className={cn("text-xs font-mono-code mt-0.5", isLocked ? "text-neon-amber" : "text-white/60")}>
+                         {new Date(test.startTime).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
+                       </p>
+                     </div>
+                     
+                     <HoloButton 
+                       variant={isLocked ? "ghost" : "cyan"} 
+                       size="sm" 
+                       onClick={() => handleStartScheduled(test)}
+                       disabled={isLocked || test.status === 'completed'}
+                       loading={startingTestId === test._id}
+                       icon={isLocked ? <Lock size={14} /> : <Zap size={14} />}
+                     >
+                       {isLocked ? "Wait" : test.status === 'live' ? "Start Now" : "Missed"}
+                     </HoloButton>
+                   </div>
+                   
+                   {/* Background accent */}
+                   {!isLocked && test.status === 'live' && (
+                     <div className="absolute top-0 right-0 w-32 h-32 bg-neon-cyan/10 blur-3xl -z-10 rounded-full mix-blend-screen transform translate-x-1/2 -translate-y-1/2" />
+                   )}
+                 </div>
+               );
+             })}
+           </div>
+        </NeonCard>
+      )}
 
       {/* ── Recent Attempts ────────────────────────────────── */}
       <NeonCard variant="default" className="animate-fade-up" padding="p-5">

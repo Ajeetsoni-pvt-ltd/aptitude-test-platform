@@ -16,6 +16,7 @@ const ResultPage = () => {
 
   const state = location.state as {
     result: {
+      attemptId: string;
       score: number;
       totalQuestions: number;
       correctCount: number;
@@ -131,12 +132,15 @@ const ResultPage = () => {
           </div>
 
           {/* Actions */}
-          <div className="flex gap-3 flex-wrap justify-center">
+          <div className="flex gap-3 flex-wrap justify-center mt-6">
+            <HoloButton variant="violet" size="md" onClick={() => navigate(`/solutions/${result.attemptId}`)} icon={<Star size={15} />}>
+              Review Solutions
+            </HoloButton>
             <HoloButton variant="cyan" size="md" onClick={() => navigate('/test-setup')} icon={<RotateCcw size={15} />}>
               New Test
             </HoloButton>
-            <HoloButton variant="violet" size="md" onClick={() => navigate('/analysis')} icon={<BarChart3 size={15} />}>
-              Analysis
+            <HoloButton variant="ghost" size="md" onClick={() => navigate('/analysis')} icon={<BarChart3 size={15} />}>
+              Analytics
             </HoloButton>
             <HoloButton variant="ghost" size="md" onClick={() => navigate('/dashboard')} icon={<LayoutDashboard size={15} />}>
               Dashboard
