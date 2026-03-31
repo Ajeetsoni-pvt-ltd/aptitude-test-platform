@@ -7,29 +7,33 @@ import { cn } from '@/lib/utils';
 import {
   LayoutDashboard, FlaskConical, BarChart3, Clock3,
   Trophy, Settings, LogOut, ChevronLeft, ChevronRight,
-  User, Bell, Shield, Zap, Plus,
+  User, Bell, Shield, Zap, Plus, Flame, CalendarPlus,
 } from 'lucide-react';
 
 interface NavItem {
   label:   string;
   path:    string;
   icon:    React.ReactNode;
-  badge?:  string | number;
+  badge?:  string | number | React.ReactNode;
   color?:  string;
 }
 
+// ── Build streak badge lazily ─────────────────────────────────────
+const getStreakCount = () => parseInt(localStorage.getItem('potd_streak') ?? '0');
+
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard',    path: '/dashboard',    icon: <LayoutDashboard size={18} />  },
-  { label: 'New Test',     path: '/test-setup',   icon: <FlaskConical size={18} />,  color: 'text-neon-cyan' },
-  { label: 'Analysis',     path: '/analysis',     icon: <BarChart3 size={18} />       },
-  { label: 'History',      path: '/history',      icon: <Clock3 size={18} />          },
-  { label: 'Leaderboard',  path: '/leaderboard',  icon: <Trophy size={18} />          },
+  { label: 'Dashboard',      path: '/dashboard',      icon: <LayoutDashboard size={18} />  },
+  { label: 'New Test',       path: '/test-setup',     icon: <FlaskConical size={18} />,   color: 'text-neon-cyan' },
+  { label: 'Daily Challenge', path: '/problem-of-day', icon: <Flame size={18} />,          color: 'text-neon-amber' },
+  { label: 'Analysis',       path: '/analysis',       icon: <BarChart3 size={18} />        },
+  { label: 'History',        path: '/history',        icon: <Clock3 size={18} />           },
+  { label: 'Leaderboard',    path: '/leaderboard',    icon: <Trophy size={18} />           },
 ];
 
 const BOTTOM_ITEMS: NavItem[] = [
-  { label: 'Profile',      path: '/profile',      icon: <User size={18} />    },
-  { label: 'Notifications',path: '/settings',     icon: <Bell size={18} />,  badge: 3 },
-  { label: 'Settings',     path: '/settings',     icon: <Settings size={18} />},
+  { label: 'Profile',       path: '/profile',   icon: <User size={18} />     },
+  { label: 'Notifications', path: '/settings',  icon: <Bell size={18} />,  badge: 3 },
+  { label: 'Settings',      path: '/settings',  icon: <Settings size={18} />  },
 ];
 
 interface SidebarProps {
@@ -41,6 +45,7 @@ const Sidebar = ({ isMobile, onClose }: SidebarProps) => {
   const [collapsed, setCollapsed] = useState(false);
   const { user, logout }          = useAuthStore();
   const navigate                  = useNavigate();
+  const streak                    = getStreakCount();
 
   const handleLogout = () => {
     logout();
@@ -59,7 +64,7 @@ const Sidebar = ({ isMobile, onClose }: SidebarProps) => {
       )}
       style={{ width: isMobile ? '260px' : sidebarWidth }}
     >
-      {/* ── Top: Logo ───────────────────────────────────── */}
+      {/* ── Top: Logo ─────────────────────────────────────────── */}
       <div className={cn(
         'flex items-center h-16 px-4 border-b border-white/5 flex-shrink-0',
         collapsed ? 'justify-center' : 'justify-between'
@@ -103,7 +108,7 @@ const Sidebar = ({ isMobile, onClose }: SidebarProps) => {
         )}
       </div>
 
-      {/* ── New Test CTA ─────────────────────────────────── */}
+      {/* ── New Test CTA ──────────────────────────────────────── */}
       {!collapsed && (
         <div className="px-4 py-3 flex-shrink-0">
           <NavLink to="/test-setup" className={({ isActive }) => cn(
@@ -124,28 +129,43 @@ const Sidebar = ({ isMobile, onClose }: SidebarProps) => {
         </div>
       )}
 
-      {/* ── Nav Items ─────────────────────────────────────── */}
+      {/* ── Nav Items ──────────────────────────────────────────── */}
       <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-1 scrollbar-none">
-        {NAV_ITEMS.filter(item => item.path !== '/test-setup').map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            className={({ isActive }) => cn(
-              'nav-item',
-              isActive && 'active',
-              collapsed && 'justify-center px-0'
-            )}
-            title={collapsed ? item.label : undefined}
-          >
-            <span className={cn('flex-shrink-0', item.color)}>{item.icon}</span>
-            {!collapsed && <span className="truncate">{item.label}</span>}
-            {!collapsed && item.badge && (
-              <span className="ml-auto text-[10px] bg-neon-magenta/20 text-neon-magenta border border-neon-magenta/30 px-1.5 py-0.5 rounded-full">
-                {item.badge}
+        {NAV_ITEMS.filter(item => item.path !== '/test-setup').map((item) => {
+          const isDaily = item.path === '/problem-of-day';
+          return (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              className={({ isActive }) => cn(
+                'nav-item',
+                isActive && 'active',
+                collapsed && 'justify-center px-0'
+              )}
+              title={collapsed ? item.label : undefined}
+            >
+              <span className={cn('flex-shrink-0 relative', item.color)}>
+                {item.icon}
+                {/* Flame pulse for daily challenge when streak active */}
+                {isDaily && streak > 0 && (
+                  <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-neon-amber animate-neon-pulse" />
+                )}
               </span>
-            )}
-          </NavLink>
-        ))}
+              {!collapsed && <span className="truncate">{item.label}</span>}
+              {/* Streak badge in sidebar */}
+              {!collapsed && isDaily && streak > 0 && (
+                <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-neon-amber/20 border border-neon-amber/30 text-neon-amber font-orbitron">
+                  {streak}🔥
+                </span>
+              )}
+              {!collapsed && item.badge && !isDaily && (
+                <span className="ml-auto text-[10px] bg-neon-magenta/20 text-neon-magenta border border-neon-magenta/30 px-1.5 py-0.5 rounded-full">
+                  {item.badge}
+                </span>
+              )}
+            </NavLink>
+          );
+        })}
 
         {/* Admin Section */}
         {user?.role === 'admin' && (
@@ -159,14 +179,22 @@ const Sidebar = ({ isMobile, onClose }: SidebarProps) => {
               <Shield size={18} className="flex-shrink-0 text-neon-violet" />
               {!collapsed && <span>Admin Panel</span>}
             </NavLink>
+            <NavLink
+              to="/admin/create-test"
+              className={({ isActive }) => cn('nav-item', isActive && 'active', collapsed && 'justify-center px-0')}
+              title={collapsed ? 'Create Test' : undefined}
+            >
+              <CalendarPlus size={18} className="flex-shrink-0 text-neon-magenta" />
+              {!collapsed && <span>Create Test</span>}
+            </NavLink>
           </>
         )}
       </nav>
 
-      {/* ── Divider ──────────────────────────────────────── */}
+      {/* ── Divider ───────────────────────────────────────────── */}
       <div className="mx-4 divider-neon-cyan opacity-20 flex-shrink-0" />
 
-      {/* ── Bottom Nav ───────────────────────────────────── */}
+      {/* ── Bottom Nav ────────────────────────────────────────── */}
       <div className="px-3 py-2 space-y-1 flex-shrink-0">
         {BOTTOM_ITEMS.map((item) => (
           <NavLink
@@ -188,7 +216,7 @@ const Sidebar = ({ isMobile, onClose }: SidebarProps) => {
         ))}
       </div>
 
-      {/* ── User Footer ──────────────────────────────────── */}
+      {/* ── User Footer ───────────────────────────────────────── */}
       <div className={cn(
         'border-t border-white/5 p-3 flex-shrink-0',
         collapsed ? 'flex flex-col items-center gap-2' : 'flex items-center gap-3'

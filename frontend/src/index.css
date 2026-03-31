@@ -396,4 +396,82 @@
   .stat-ring-violet  { stroke: #9D00FF; filter: drop-shadow(0 0 6px rgba(157,0,255,0.8)); }
   .stat-ring-green   { stroke: #00FF88; filter: drop-shadow(0 0 6px rgba(0,255,136,0.8)); }
   .stat-ring-amber   { stroke: #FFB700; filter: drop-shadow(0 0 6px rgba(255,183,0,0.8)); }
+
+  /* ── Holo Lock (scheduled test locked state) ── */
+  .holo-lock {
+    background: linear-gradient(135deg, rgba(255,183,0,0.08), rgba(255,51,102,0.08));
+    border: 1px solid rgba(255,183,0,0.25);
+    border-radius: 1rem;
+    animation: holo-shimmer 3s ease-in-out infinite;
+    position: relative;
+    overflow: hidden;
+  }
+  .holo-lock::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,183,0,0.06) 50%, transparent 100%);
+    background-size: 200% 100%;
+    animation: shimmer-sweep 2s linear infinite;
+  }
+
+  /* ── Streak fire badge ── */
+  .streak-badge {
+    background: linear-gradient(135deg, rgba(255,100,0,0.2), rgba(255,183,0,0.2));
+    border: 1px solid rgba(255,150,0,0.4);
+    border-radius: 999px;
+    box-shadow: 0 0 20px rgba(255,100,0,0.3), inset 0 0 15px rgba(255,183,0,0.1);
+    animation: streak-glow 2s ease-in-out infinite;
+  }
+
+  /* ── Face warning overlay ── */
+  .face-warning-active {
+    animation: face-warning-pulse 1s ease-in-out infinite;
+  }
+}
+
+/* ── New Keyframe Animations ────────────────────────────────── */
+@keyframes face-warning-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.7; }
+}
+
+@keyframes holo-shimmer {
+  0%, 100% { box-shadow: 0 0 15px rgba(255,183,0,0.15), inset 0 0 20px rgba(255,183,0,0.05); }
+  50%       { box-shadow: 0 0 30px rgba(255,183,0,0.3),  inset 0 0 30px rgba(255,183,0,0.1); }
+}
+
+@keyframes shimmer-sweep {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+@keyframes streak-glow {
+  0%, 100% { box-shadow: 0 0 15px rgba(255,100,0,0.3), 0 0 30px rgba(255,183,0,0.1); }
+  50%       { box-shadow: 0 0 25px rgba(255,100,0,0.5), 0 0 50px rgba(255,183,0,0.2); }
+}
+
+@keyframes particle-burst {
+  0%   { transform: scale(0) translate(0, 0); opacity: 1; }
+  100% { transform: scale(1) translate(var(--tx, 60px), var(--ty, -60px)); opacity: 0; }
+}
+
+@keyframes reward-flash {
+  0%   { opacity: 0; transform: scale(0.5); }
+  40%  { opacity: 1; transform: scale(1.1); }
+  70%  { transform: scale(0.95); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes streak-flame {
+  0%,100% { transform: scaleY(1) rotate(-2deg); }
+  25%     { transform: scaleY(1.1) rotate(2deg); }
+  50%     { transform: scaleY(0.95) rotate(-1deg); }
+  75%     { transform: scaleY(1.05) rotate(1deg); }
+}
+
+@keyframes count-up-bounce {
+  0%   { transform: translateY(20px) scale(0.8); opacity: 0; }
+  60%  { transform: translateY(-4px) scale(1.05); opacity: 1; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
 }

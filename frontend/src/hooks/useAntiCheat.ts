@@ -1,124 +1,213 @@
 // frontend/src/hooks/useAntiCheat.ts
-// ─────────────────────────────────────────────────────────────
-// Custom Hook: Anti-cheat detection
-// Tab switch, window blur, right-click detect karo [web:178]
-// Kyun: Online exams mein cheating rokna zaroori hai
-// HackerRank, TCS NQT sab yahi technique use karte hain
-// ─────────────────────────────────────────────────────────────
+// Enhanced Anti-Cheat: 3-strike auto-submit, fullscreen monitoring,
+// keyboard shortcut blocking (F12, DevTools, Ctrl+Tab, etc.)
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-interface AntiCheatWarning {
-  type: 'TAB_SWITCH' | 'WINDOW_BLUR' | 'FULLSCREEN_EXIT';
+export type AntiCheatMode = 'proctored' | 'normal';
+
+export interface AntiCheatWarning {
+  type: 'TAB_SWITCH' | 'WINDOW_BLUR' | 'FULLSCREEN_EXIT' | 'KEYBOARD_SHORTCUT';
   message: string;
   timestamp: Date;
 }
 
-interface UseAntiCheatReturn {
-  warningCount: number;
-  lastWarning: AntiCheatWarning | null;
-  isWarningVisible: boolean;
-  dismissWarning: () => void;
-  violations: AntiCheatWarning[];
+interface UseAntiCheatOptions {
+  isTestActive: boolean;
+  mode?: AntiCheatMode;
+  maxTabSwitches?: number; // default: 3
+  onAutoSubmit?: () => void;
 }
 
-const MAX_WARNINGS = 3; // Itne warnings ke baad auto-submit message
+interface UseAntiCheatReturn {
+  warningCount:      number;
+  tabSwitchCount:    number;
+  lastWarning:       AntiCheatWarning | null;
+  isWarningVisible:  boolean;
+  dismissWarning:    () => void;
+  violations:        AntiCheatWarning[];
+}
 
-const useAntiCheat = (isTestActive: boolean): UseAntiCheatReturn => {
-  const [warningCount, setWarningCount]       = useState(0);
-  const [lastWarning, setLastWarning]         = useState<AntiCheatWarning | null>(null);
+const useAntiCheat = ({
+  isTestActive,
+  mode = 'proctored',
+  maxTabSwitches = 3,
+  onAutoSubmit,
+}: UseAntiCheatOptions): UseAntiCheatReturn => {
+  const [warningCount,     setWarningCount]     = useState(0);
+  const [tabSwitchCount,   setTabSwitchCount]   = useState(0);
+  const [lastWarning,      setLastWarning]       = useState<AntiCheatWarning | null>(null);
   const [isWarningVisible, setIsWarningVisible] = useState(false);
-  const [violations, setViolations]           = useState<AntiCheatWarning[]>([]);
+  const [violations,       setViolations]       = useState<AntiCheatWarning[]>([]);
 
-  // Ref use karo — stale closure avoid ke liye
-  const isActiveRef = useRef(isTestActive);
-  useEffect(() => { isActiveRef.current = isTestActive; }, [isTestActive]);
+  const isActiveRef      = useRef(isTestActive);
+  const tabSwitchRef     = useRef(0);
+  const onAutoSubmitRef  = useRef(onAutoSubmit);
+  const modeRef          = useRef(mode);
 
-  // ─── Warning add karo ─────────────────────────────────────
-  const addWarning = useCallback((type: AntiCheatWarning['type'], message: string) => {
-    if (!isActiveRef.current) return; // Test active nahi → ignore
+  useEffect(() => { isActiveRef.current = isTestActive; },    [isTestActive]);
+  useEffect(() => { onAutoSubmitRef.current = onAutoSubmit; }, [onAutoSubmit]);
+  useEffect(() => { modeRef.current = mode; },                [mode]);
+
+  // ── Add a warning and optionally trigger auto-submit ──────────
+  const addWarning = useCallback((type: AntiCheatWarning['type'], message: string, isTabSwitch = false) => {
+    if (!isActiveRef.current) return;
 
     const warning: AntiCheatWarning = { type, message, timestamp: new Date() };
-
-    setViolations((prev) => [...prev, warning]);
+    setViolations(prev => [...prev, warning]);
     setLastWarning(warning);
-    setWarningCount((prev) => prev + 1);
+    setWarningCount(prev => prev + 1);
     setIsWarningVisible(true);
-  }, []);
 
-  // ─── Tab Switch Detection ──────────────────────────────────
-  // visibilitychange event → document.hidden check karo [web:180]
+    if (isTabSwitch) {
+      const newCount = tabSwitchRef.current + 1;
+      tabSwitchRef.current = newCount;
+      setTabSwitchCount(newCount);
+
+      // Auto-submit after maxTabSwitches — EXACT behavior as specified
+      if (newCount >= maxTabSwitches && onAutoSubmitRef.current) {
+        setTimeout(() => {
+          if (isActiveRef.current) {
+            onAutoSubmitRef.current?.();
+          }
+        }, 1500); // small delay so warning is visible
+      }
+    }
+  }, [maxTabSwitches]);
+
+  // ── Tab Switch Detection (visibilitychange) ───────────────────
   useEffect(() => {
-    if (!isTestActive) return;
+    if (!isTestActive || modeRef.current !== 'proctored') return;
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
+        const count = tabSwitchRef.current + 1;
+        const remaining = maxTabSwitches - count;
         addWarning(
           'TAB_SWITCH',
-          '⚠️ Tab switch detect hua! Exam mein tab switch karna allowed nahi hai.'
+          remaining > 0
+            ? `⚠️ Tab switch detected! ${remaining} warning${remaining === 1 ? '' : 's'} remaining before auto-submit.`
+            : '🚨 Maximum tab switches exceeded. Auto-submitting test now...',
+          true
         );
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [isTestActive, addWarning]);
+  }, [isTestActive, addWarning, maxTabSwitches]);
 
-  // ─── Window Blur Detection ────────────────────────────────
-  // Alt+Tab ya outside click detect karo [web:182]
+  // ── Window Blur Detection (Alt+Tab, outside click) ───────────
   useEffect(() => {
-    if (!isTestActive) return;
+    if (!isTestActive || modeRef.current !== 'proctored') return;
 
+    let blurTimeout: ReturnType<typeof setTimeout>;
     const handleBlur = () => {
-      addWarning(
-        'WINDOW_BLUR',
-        '⚠️ Window focus kho gayi! Alt+Tab ya bahar click allowed nahi hai.'
-      );
+      // Debounce to avoid duplicate with visibilitychange
+      blurTimeout = setTimeout(() => {
+        if (!document.hidden && isActiveRef.current) {
+          addWarning('WINDOW_BLUR', '⚠️ Window lost focus. Stay on the test window.');
+        }
+      }, 300);
     };
+    const handleFocus = () => clearTimeout(blurTimeout);
 
     window.addEventListener('blur', handleBlur);
-    return () => window.removeEventListener('blur', handleBlur);
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      clearTimeout(blurTimeout);
+      window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, [isTestActive, addWarning]);
 
-  // ─── Right Click Block ─────────────────────────────────────
+  // ── Fullscreen Exit Detection ─────────────────────────────────
   useEffect(() => {
-    if (!isTestActive) return;
+    if (!isTestActive || modeRef.current !== 'proctored') return;
 
-    const handleContextMenu = (e: MouseEvent) => {
-      e.preventDefault(); // Right click block
-    };
-
-    document.addEventListener('contextmenu', handleContextMenu);
-    return () => document.removeEventListener('contextmenu', handleContextMenu);
-  }, [isTestActive]);
-
-  // ─── Copy Paste Block ──────────────────────────────────────
-  useEffect(() => {
-    if (!isTestActive) return;
-
-    const blockCopyPaste = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && ['c', 'v', 'u', 's'].includes(e.key.toLowerCase())) {
-        e.preventDefault();
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement && isActiveRef.current) {
+        addWarning('FULLSCREEN_EXIT', '⚠️ Fullscreen exited! Please return to fullscreen mode.');
       }
     };
 
-    document.addEventListener('keydown', blockCopyPaste);
-    return () => document.removeEventListener('keydown', blockCopyPaste);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, [isTestActive, addWarning]);
+
+  // ── Keyboard Shortcut Blocking ────────────────────────────────
+  useEffect(() => {
+    if (!isTestActive) return;
+
+    const blockKeys = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+      const ctrl = e.ctrlKey || e.metaKey;
+      const shift = e.shiftKey;
+      const alt = e.altKey;
+
+      // DevTools: F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C
+      if (key === 'f12') { e.preventDefault(); return; }
+      if (ctrl && shift && ['i', 'j', 'c', 'k'].includes(key)) { e.preventDefault(); return; }
+
+      // View Source: Ctrl+U
+      if (ctrl && key === 'u') { e.preventDefault(); return; }
+
+      // Save: Ctrl+S
+      if (ctrl && key === 's') { e.preventDefault(); return; }
+
+      // Copy/Paste/Cut: Ctrl+C, Ctrl+V, Ctrl+X
+      if (ctrl && ['c', 'v', 'x'].includes(key)) { e.preventDefault(); return; }
+
+      // Tab navigation in proctored mode
+      if (modeRef.current === 'proctored') {
+        // Alt+Tab (can't always block OS-level but can prevent browser behavior)
+        if (alt && key === 'tab') { e.preventDefault(); return; }
+
+        // Ctrl+Tab (switch browser tabs)
+        if (ctrl && key === 'tab') { e.preventDefault(); return; }
+
+        // Ctrl+W (close tab)
+        if (ctrl && key === 'w') { e.preventDefault(); return; }
+
+        // Ctrl+N / Ctrl+T (new window/tab)
+        if (ctrl && (key === 'n' || key === 't')) { e.preventDefault(); return; }
+
+        // Escape (may exit fullscreen)
+        // We can't prevent Escape from exiting fullscreen, but we can detect it
+      }
+
+      // Right-click context menu block
+    };
+
+    const blockContextMenu = (e: MouseEvent) => e.preventDefault();
+
+    document.addEventListener('keydown', blockKeys);
+    document.addEventListener('contextmenu', blockContextMenu);
+    return () => {
+      document.removeEventListener('keydown', blockKeys);
+      document.removeEventListener('contextmenu', blockContextMenu);
+    };
   }, [isTestActive]);
 
-  // ─── Warning Dismiss ───────────────────────────────────────
+  // ── Beforeunload (prevent accidental exit) ────────────────────
+  useEffect(() => {
+    if (!isTestActive || modeRef.current !== 'proctored') return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = 'Are you sure you want to leave? Your test will be auto-submitted.';
+      return e.returnValue;
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isTestActive]);
+
   const dismissWarning = useCallback(() => {
     setIsWarningVisible(false);
   }, []);
 
-  // ─── Max warnings reached? → Log karo ─────────────────────
-  useEffect(() => {
-    if (warningCount >= MAX_WARNINGS) {
-      console.warn(`🚨 Max warnings (${MAX_WARNINGS}) reached!`);
-    }
-  }, [warningCount]);
-
-  return { warningCount, lastWarning, isWarningVisible, dismissWarning, violations };
+  return { warningCount, tabSwitchCount, lastWarning, isWarningVisible, dismissWarning, violations };
 };
 
 export default useAntiCheat;

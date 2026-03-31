@@ -18,7 +18,7 @@ import {
 } from 'recharts';
 import {
   BookOpen, Trophy, Clock, TrendingUp, Plus, ArrowRight,
-  Zap, Target, ChevronRight, Star, Activity, Brain,
+  Zap, Target, ChevronRight, Star, Activity, Brain, Flame,
 } from 'lucide-react';
 
 // ── Custom chart tooltip ──────────────────────────────────────────
@@ -49,15 +49,59 @@ const QuickAction = ({
     className={`neon-card ${color} p-4 text-left w-full group transition-all duration-300`}
   >
     <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3
-      ${color === 'cyan' ? 'bg-neon-cyan/10 text-neon-cyan' : color === 'violet' ? 'bg-neon-violet/10 text-neon-violet' : 'bg-neon-magenta/10 text-neon-magenta'}
+      ${
+        color === 'cyan' ? 'bg-neon-cyan/10 text-neon-cyan'
+        : color === 'violet' ? 'bg-neon-violet/10 text-neon-violet'
+        : color === 'amber' ? 'bg-neon-amber/10 text-neon-amber'
+        : 'bg-neon-magenta/10 text-neon-magenta'
+      }
       group-hover:scale-110 transition-transform duration-200`}>
       {icon}
     </div>
     <p className="font-semibold text-white text-sm font-inter">{label}</p>
     <p className="text-white/35 text-xs mt-0.5 font-inter">{desc}</p>
-    <ChevronRight size={14} className={`mt-2 ${color === 'cyan' ? 'text-neon-cyan' : color === 'violet' ? 'text-neon-violet' : 'text-neon-magenta'} group-hover:translate-x-1 transition-transform`} />
+    <ChevronRight size={14} className={`mt-2 ${
+      color === 'cyan' ? 'text-neon-cyan'
+      : color === 'violet' ? 'text-neon-violet'
+      : color === 'amber' ? 'text-neon-amber'
+      : 'text-neon-magenta'
+    } group-hover:translate-x-1 transition-transform`} />
   </button>
 );
+
+// ── Problem of the Day mini-card for dashboard ────────────────────
+const PotdCard = ({ navigate }: { navigate: (to: string) => void }) => {
+  const streak     = parseInt(localStorage.getItem('potd_streak') ?? '0');
+  const solvedToday = localStorage.getItem('potd_solved_date') === new Date().toISOString().split('T')[0];
+  return (
+    <NeonCard variant="amber" className="mb-6 animate-fade-up" padding="p-4">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-neon-amber/20 to-orange-500/20 border border-neon-amber/30 flex items-center justify-center flex-shrink-0">
+            <Flame size={24} className="text-neon-amber" style={{ animation: 'streak-flame 0.8s ease-in-out infinite' }} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <p className="font-inter font-semibold text-white">Problem of the Day</p>
+              {streak > 0 && (
+                <span className="streak-badge inline-flex items-center gap-1 px-2 py-0.5">
+                  <span className="text-sm">🔥</span>
+                  <span className="font-orbitron font-bold text-neon-amber text-xs">{streak}</span>
+                </span>
+              )}
+            </div>
+            <p className="text-white/30 text-xs font-inter mt-0.5">
+              {solvedToday ? '✅ Solved today — come back tomorrow!' : '⚡ Today\'s challenge is waiting'}
+            </p>
+          </div>
+        </div>
+        <HoloButton variant="ghost" size="sm" onClick={() => navigate('/problem-of-day')} icon={<ChevronRight size={14} />}>
+          {solvedToday ? 'Review' : 'Solve Now'}
+        </HoloButton>
+      </div>
+    </NeonCard>
+  );
+};
 
 // ── Main Dashboard ────────────────────────────────────────────────
 const DashboardPage = () => {
@@ -223,18 +267,25 @@ const DashboardPage = () => {
       </div>
 
       {/* ── Quick Actions ──────────────────────────────────── */}
-      <div className="mb-8 animate-fade-up">
+      <div className="mb-6 animate-fade-up">
         <h2 className="font-inter font-semibold text-white mb-4 flex items-center gap-2">
           <Zap size={16} className="text-neon-cyan" />
           Quick Actions
         </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <QuickAction
             icon={<Plus size={20} />}
             label="New Test"
             desc="Start a practice session"
             onClick={() => navigate('/test-setup')}
             color="cyan"
+          />
+          <QuickAction
+            icon={<Flame size={20} />}
+            label="Daily Challenge"
+            desc="Today's problem + streak"
+            onClick={() => navigate('/problem-of-day')}
+            color="amber"
           />
           <QuickAction
             icon={<Brain size={20} />}
@@ -252,6 +303,9 @@ const DashboardPage = () => {
           />
         </div>
       </div>
+
+      {/* ── Problem of the Day Card ─────────────────────────── */}
+      <PotdCard navigate={navigate} />
 
       {/* ── Recent Attempts ────────────────────────────────── */}
       <NeonCard variant="default" className="animate-fade-up" padding="p-5">
