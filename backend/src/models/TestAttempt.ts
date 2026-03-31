@@ -21,6 +21,7 @@ export interface ITestAttempt extends Document {
   skipped: number;
   totalTime: number;             // total seconds
   topicPerformance?: Map<string, { correct: number; total: number }>; // topic-wise stats
+  scheduledTest?: Types.ObjectId; // reference to ScheduledTest if this is a scheduled test attempt
   createdAt: Date;
   completedAt?: Date;
 }
@@ -65,6 +66,11 @@ const testAttemptSchema = new Schema<ITestAttempt>(
         correct: Number,
         total: Number,
       },
+    },
+    scheduledTest: {
+      type: Schema.Types.ObjectId,
+      ref: 'ScheduledTest',
+      default: null,
     },
   },
   { timestamps: true }

@@ -13,10 +13,11 @@ import rateLimit from 'express-rate-limit';
 import authRoutes from './routes/authRoutes';
 import questionRoutes from './routes/questionRoutes';
 import testRoutes from './routes/testRoutes';
-const app: Application = express();
 import uploadRoutes from './routes/uploadRoutes';
 import adminRoutes from './routes/adminRoutes';
 import scheduledTestRoutes from './routes/scheduledTestRoutes';
+import notificationRoutes from './routes/notificationRoutes';
+const app: Application = express();
 
 // ─── Security Middleware ───────────────────────────────────────
 // helmet: Sets secure HTTP response headers (XSS, clickjacking protection)
@@ -84,6 +85,7 @@ app.use('/api/tests', testRoutes);                  // ✅ Tests
 app.use('/api/upload', uploadRoutes);               // ✅ Upload
 app.use('/api/admin', adminRoutes);                 // ✅ Admin stats
 app.use('/api/scheduled-tests', scheduledTestRoutes); // ✅ Scheduled Tests
+app.use('/api/notifications', notificationRoutes);  // ✅ Notifications
 
 
 // ─── 404 Handler ──────────────────────────────────────────────

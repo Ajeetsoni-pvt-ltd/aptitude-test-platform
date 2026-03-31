@@ -95,10 +95,14 @@ export const uploadQuestions = asyncHandler(
       }
 
       // ─── Step 8: Response bhejo ────────────────────────────
+      // Include question IDs from insertResult so frontend can link them to scheduled test
+      const questionIds = insertResult.map((q: any) => q._id);
+      
       res.status(201).json(
         successResponse(
           `🎉 Bulk import complete! ${savedCount} questions save ho gaye.`,
           {
+            questionIds, // Array of saved question ObjectIds
             totalParsed: questions.length,
             savedCount,
             parseErrors:

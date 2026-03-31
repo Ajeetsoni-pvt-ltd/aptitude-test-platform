@@ -98,7 +98,7 @@ export const getAdminStats = asyncHandler(
 export const getAllUsers = asyncHandler(
   async (req: Request, res: Response) => {
     const page  = Math.max(1, parseInt(req.query.page as string) || 1);
-    const limit = Math.min(20, parseInt(req.query.limit as string) || 10);
+    const limit = Math.min(1000, parseInt(req.query.limit as string) || 10);
     const skip  = (page - 1) * limit;
 
     // Search by name/email
