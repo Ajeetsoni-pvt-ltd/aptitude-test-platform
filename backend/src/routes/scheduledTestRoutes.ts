@@ -8,6 +8,7 @@ import {
   getMyScheduledTests,
   updateScheduledTest,
   deleteScheduledTest,
+  startScheduledTest,
 } from '../controllers/scheduledTestController';
 import { protect, adminOnly } from '../middlewares/authMiddleware';
 
@@ -18,6 +19,9 @@ router.use(protect);
 
 // Student: Get my assigned tests
 router.get('/my', getMyScheduledTests);
+
+// Student: Start a scheduled test
+router.post('/:id/start', startScheduledTest);
 
 // Admin: Full CRUD
 router.get('/',         adminOnly, getScheduledTests);

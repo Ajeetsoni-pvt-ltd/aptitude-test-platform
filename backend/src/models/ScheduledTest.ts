@@ -14,6 +14,7 @@ export interface IScheduledTest extends Document {
   createdBy:      mongoose.Types.ObjectId;
   status:         'locked' | 'live' | 'completed';
   uploadedQuestions?: string;    // reference to upload job / file path
+  customQuestions?: mongoose.Types.ObjectId[]; // exact uploaded questions for this test
   createdAt:      Date;
   updatedAt:      Date;
 }
@@ -71,6 +72,12 @@ const scheduledTestSchema = new Schema<IScheduledTest>(
       type: String,
       default: null,
     },
+    customQuestions: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'Question',
+      },
+    ],
   },
   { timestamps: true }
 );

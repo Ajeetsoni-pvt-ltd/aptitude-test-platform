@@ -3,6 +3,9 @@
 
 import { Request, Response } from 'express';
 import ScheduledTest from '../models/ScheduledTest';
+import Notification from '../models/Notification';
+import Question from '../models/Question';
+import TestAttempt from '../models/TestAttempt';
 import mongoose from 'mongoose';
 
 // ── Create a scheduled test ───────────────────────────────────────
@@ -10,7 +13,7 @@ export const createScheduledTest = async (req: Request, res: Response): Promise<
   try {
     const {
       title, topic, difficulty, questionCount, timeLimit,
-      startTime, assignedStudents,
+      startTime, assignedStudents, customQuestions,
     } = req.body;
 
     const adminId = (req as Request & { user?: { id: string } }).user?.id;
@@ -29,7 +32,20 @@ export const createScheduledTest = async (req: Request, res: Response): Promise<
       assignedStudents: (assignedStudents as string[] || []).map(id => new mongoose.Types.ObjectId(id)),
       createdBy: new mongoose.Types.ObjectId(adminId),
       status: new Date(startTime) > new Date() ? 'locked' : 'live',
+      customQuestions: customQuestions ? (customQuestions as string[]).map(id => new mongoose.Types.ObjectId(id)) : undefined,
     });
+
+    const notifications = (assignedStudents as string[] || []).map(id => ({
+      user: new mongoose.Types.ObjectId(id),
+      title: 'New Test Assigned',
+      message: `You have been assigned a new test: ${title}. Scheduled for ${new Date(startTime).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}.`,
+      type: 'test_assigned',
+      relatedEntity: test._id,
+    }));
+
+    if (notifications.length > 0) {
+      await Notification.insertMany(notifications);
+    }
 
     res.status(201).json({ success: true, data: test });
   } catch (error) {
@@ -118,6 +134,109 @@ export const deleteScheduledTest = async (req: Request, res: Response): Promise<
     res.status(200).json({ success: true, message: 'Scheduled test deleted' });
   } catch (error) {
     const err = error as Error;
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ── Start a scheduled test (Student starts taking the test) ───────
+export const startScheduledTest = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id: testId } = req.params;
+    const studentId = (req as Request & { user?: { id: string } }).user?.id;
+
+    if (!studentId) {
+      res.status(401).json({ success: false, message: 'Unauthorized' });
+      return;
+    }
+
+    // ─── Step 1: Fetch scheduled test ──────────────────────────
+    const scheduledTest = await ScheduledTest
+      .findById(testId)
+      .populate('customQuestions');
+
+    if (!scheduledTest) {
+      res.status(404).json({ success: false, message: 'Scheduled test not found' });
+      return;
+    }
+
+    // ─── Step 2: Verify student is assigned to this test ────────
+    const isAssigned = scheduledTest.assignedStudents.some(
+      id => id.toString() === studentId
+    );
+
+    if (!isAssigned) {
+      res.status(403).json({ success: false, message: 'You are not assigned to this test' });
+      return;
+    }
+
+    // ─── Step 3: Check if test is live (not locked or completed) ─
+    const now = Date.now();
+    const start = scheduledTest.startTime.getTime();
+    const end = start + scheduledTest.timeLimit * 60_000;
+
+    if (now < start) {
+      res.status(400).json({ success: false, message: 'Test has not started yet' });
+      return;
+    }
+
+    if (now >= end) {
+      res.status(400).json({ success: false, message: 'Test session has ended' });
+      return;
+    }
+
+    // ─── Step 4: Get questions from scheduled test ─────────────
+    let questions = scheduledTest.customQuestions || [];
+
+    // If no custom questions, fetch by topic/difficulty (fallback)
+    if (!questions || questions.length === 0) {
+      const filter: Record<string, string> = { topic: scheduledTest.topic };
+      if (scheduledTest.difficulty !== 'all') {
+        filter.difficulty = scheduledTest.difficulty;
+      }
+      questions = await Question
+        .find(filter)
+        .limit(scheduledTest.questionCount)
+        .select('-correctAnswer -explanation');
+    } else {
+      // Hide correct answers and explanations
+      questions = questions.map((q: any) => {
+        const obj = q.toObject ? q.toObject() : q;
+        delete obj.correctAnswer;
+        delete obj.explanation;
+        return obj;
+      });
+    }
+
+    // ─── Step 5: Create TestAttempt with scheduled test reference ─
+    const attempt = await TestAttempt.create({
+      user: new mongoose.Types.ObjectId(studentId),
+      testType: 'custom',
+      title: scheduledTest.title,
+      questions: questions.map((q: any) => q._id),
+      answers: [],
+      score: 0,
+      totalQuestions: questions.length,
+      correct: 0,
+      incorrect: 0,
+      skipped: 0,
+      totalTime: 0,
+      topicPerformance: {},
+      scheduledTest: new mongoose.Types.ObjectId(testId),
+    });
+
+    // ─── Step 6: Return response ──────────────────────────────
+    res.status(201).json({
+      success: true,
+      data: {
+        attemptId: attempt._id,
+        title: scheduledTest.title,
+        totalQuestions: questions.length,
+        questions,
+      },
+    });
+  } catch (error) {
+    const err = error as Error;
+    console.error('Error starting scheduled test:', err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
