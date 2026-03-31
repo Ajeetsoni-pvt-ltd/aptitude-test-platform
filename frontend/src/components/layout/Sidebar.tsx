@@ -1,7 +1,8 @@
 // src/components/layout/Sidebar.tsx
-import { useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
+import { getMyNotificationsApi } from '@/api/notificationApi';
 import NeuralAvatar from '@/components/ui/NeuralAvatar';
 import { cn } from '@/lib/utils';
 import {
@@ -32,7 +33,7 @@ const NAV_ITEMS: NavItem[] = [
 
 const BOTTOM_ITEMS: NavItem[] = [
   { label: 'Profile',       path: '/profile',   icon: <User size={18} />     },
-  { label: 'Notifications', path: '/settings',  icon: <Bell size={18} />,  badge: 3 },
+  { label: 'Notifications', path: '/notifications', icon: <Bell size={18} />, badge: 0 },
   { label: 'Settings',      path: '/settings',  icon: <Settings size={18} />  },
 ];
 
@@ -43,9 +44,21 @@ interface SidebarProps {
 
 const Sidebar = ({ isMobile, onClose }: SidebarProps) => {
   const [collapsed, setCollapsed] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const { user, logout }          = useAuthStore();
   const navigate                  = useNavigate();
+  const location                  = useLocation();
   const streak                    = getStreakCount();
+
+  useEffect(() => {
+    if (user) {
+      getMyNotificationsApi().then(res => {
+        if (res.success && res.data) {
+          setUnreadCount(res.data.unreadCount);
+        }
+      }).catch(() => null);
+    }
+  }, [user, location.pathname]); // refetch on navigation changes
 
   const handleLogout = () => {
     logout();
@@ -196,24 +209,27 @@ const Sidebar = ({ isMobile, onClose }: SidebarProps) => {
 
       {/* ── Bottom Nav ────────────────────────────────────────── */}
       <div className="px-3 py-2 space-y-1 flex-shrink-0">
-        {BOTTOM_ITEMS.map((item) => (
-          <NavLink
-            key={item.label}
-            to={item.path}
-            className={({ isActive }) => cn('nav-item', isActive && 'active', collapsed && 'justify-center px-0')}
-            title={collapsed ? item.label : undefined}
-          >
-            <span className="flex-shrink-0 relative">
-              {item.icon}
-              {item.badge && (
-                <span className="absolute -top-1 -right-1 w-3 h-3 bg-neon-magenta rounded-full text-[8px] flex items-center justify-center text-white animate-neon-pulse">
-                  {item.badge}
-                </span>
-              )}
-            </span>
-            {!collapsed && <span className="truncate">{item.label}</span>}
-          </NavLink>
-        ))}
+        {BOTTOM_ITEMS.map((item) => {
+          const badgeValue = item.label === 'Notifications' ? unreadCount : item.badge;
+          return (
+            <NavLink
+              key={item.label}
+              to={item.path}
+              className={({ isActive }) => cn('nav-item', isActive && 'active', collapsed && 'justify-center px-0')}
+              title={collapsed ? item.label : undefined}
+            >
+              <span className="flex-shrink-0 relative">
+                {item.icon}
+                {badgeValue ? (
+                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-neon-magenta rounded-full text-[8px] flex items-center justify-center text-white animate-neon-pulse">
+                    {badgeValue}
+                  </span>
+                ) : null}
+              </span>
+              {!collapsed && <span className="truncate">{item.label}</span>}
+            </NavLink>
+          );
+        })}
       </div>
 
       {/* ── User Footer ───────────────────────────────────────── */}

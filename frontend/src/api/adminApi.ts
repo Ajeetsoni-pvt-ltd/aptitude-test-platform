@@ -45,3 +45,15 @@ export const deleteQuestionApi = async (questionId: string) => {
   const response = await apiClient.delete(`/questions/${questionId}`);
   return response.data;
 };
+// ─── Upload Questions from DOCX File ───────────────────────────
+export const uploadQuestionsApi = async (file: File) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  const response = await apiClient.post('/upload/questions', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return response.data;
+};
