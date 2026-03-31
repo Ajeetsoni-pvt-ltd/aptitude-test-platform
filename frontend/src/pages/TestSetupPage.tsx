@@ -1,5 +1,5 @@
 // src/pages/TestSetupPage.tsx
-// Futuristic multi-step test configuration wizard
+// Futuristic multi-step test configuration wizard with StartTestModal
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -7,6 +7,7 @@ import { startTestApi } from '@/api/testApi';
 import AppLayout from '@/components/layout/AppLayout';
 import NeonCard from '@/components/ui/NeonCard';
 import HoloButton from '@/components/ui/HoloButton';
+import StartTestModal, { type StartTestConfig } from '@/components/ui/StartTestModal';
 import { ChevronRight, ChevronLeft, Zap, Brain, Hash, Clock, AlertTriangle, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -56,22 +57,28 @@ const TestSetupPage = () => {
   const [count,    setCount]    = useState(10);
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState('');
+  const [showModal, setShowModal] = useState(false);
 
-  const timeMin    = count * 2;
-  const timeSeconds = count * 2 * 60;
+  const timeMin     = count * 2;
 
-  const handleStart = async () => {
+  // Called when user clicks "Start Now" inside the modal
+  const handleLaunch = async (config: StartTestConfig) => {
     if (!topic) { setError('Please select a topic first.'); return; }
     setError('');
     setLoading(true);
+
+    const questionCount = config.questionCount;
+    const timeSeconds   = config.timeMinutes * 60;
+
     try {
       const res = await startTestApi({
         topic,
         difficulty: diff === 'all' ? undefined : diff,
-        count,
-        title: `${topic} — ${diff === 'all' ? 'Mixed' : diff.charAt(0).toUpperCase() + diff.slice(1)} (${count}Q)`,
+        count: questionCount,
+        title: `${topic} — ${diff === 'all' ? 'Mixed' : diff.charAt(0).toUpperCase() + diff.slice(1)} (${questionCount}Q)`,
       });
       if (res.success && res.data) {
+        setShowModal(false);
         navigate('/test', {
           state: {
             attemptId:      res.data.attemptId,
@@ -79,6 +86,7 @@ const TestSetupPage = () => {
             title:          res.data.title,
             totalQuestions: res.data.totalQuestions,
             totalTime:      timeSeconds,
+            isProctored:    config.environment === 'proctored',
           },
         });
       }
@@ -106,7 +114,7 @@ const TestSetupPage = () => {
         <div className="flex-1 h-px bg-gradient-to-r from-neon-cyan/30 via-white/10 to-neon-violet/30" />
         <StepDot step={2} current={step} label="Config" />
         <div className="flex-1 h-px bg-gradient-to-r from-neon-violet/30 via-white/10 to-neon-cyan/30" />
-        <StepDot step={3} current={step} label="Confirm" />
+        <StepDot step={3} current={step} label="Launch" />
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
@@ -181,7 +189,7 @@ const TestSetupPage = () => {
                 <Zap size={18} className="text-neon-violet" />
                 Configure Parameters
               </h2>
-              <p className="text-white/30 text-sm mb-6 font-inter">Set difficulty and question count</p>
+              <p className="text-white/30 text-sm mb-6 font-inter">Set difficulty and default question count</p>
 
               {/* Difficulty */}
               <div className="mb-6">
@@ -206,10 +214,10 @@ const TestSetupPage = () => {
                 </div>
               </div>
 
-              {/* Question count */}
+              {/* Default question count */}
               <div className="mb-6">
                 <p className="text-white/40 text-xs uppercase tracking-widest mb-3 font-inter flex items-center gap-2">
-                  <Hash size={12} /> Number of Questions
+                  <Hash size={12} /> Default Questions (can customise at launch)
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {QUESTION_COUNTS.map((n) => (
@@ -228,7 +236,7 @@ const TestSetupPage = () => {
                   ))}
                 </div>
                 <p className="text-white/20 text-xs mt-2 font-inter flex items-center gap-1.5">
-                  <Clock size={11} /> Estimated time: {timeMin} minutes
+                  <Clock size={11} /> Estimated time: {timeMin} minutes · Customisable in launch dialog
                 </p>
               </div>
 
@@ -243,33 +251,36 @@ const TestSetupPage = () => {
             </NeonCard>
           )}
 
-          {/* STEP 3: Confirm */}
+          {/* STEP 3: Confirm & Launch Modal */}
           {step === 3 && (
             <NeonCard variant="magenta" className="animate-fade-up" padding="p-6">
               <h2 className="font-inter font-semibold text-white mb-1 flex items-center gap-2">
                 <Zap size={18} className="text-neon-magenta" />
                 Ready to Launch
               </h2>
-              <p className="text-white/30 text-sm mb-6 font-inter">Review your configuration before starting</p>
+              <p className="text-white/30 text-sm mb-6 font-inter">Choose your environment and customize last details</p>
 
-              {/* Rules */}
-              <div className="p-4 rounded-xl bg-neon-amber/5 border border-neon-amber/20 mb-5">
-                <p className="text-neon-amber text-xs font-semibold mb-2 flex items-center gap-1.5">
-                  <AlertTriangle size={13} /> Test Protocols
+              {/* Summary cards */}
+              <div className="grid grid-cols-3 gap-3 mb-6">
+                {[
+                  { label: 'Domain',     value: topic.split(' ')[0], color: 'text-neon-cyan' },
+                  { label: 'Difficulty', value: diff === 'all' ? 'Mixed' : diff, color: 'text-neon-violet' },
+                  { label: 'Default Q', value: `${count}`, color: 'text-neon-green' },
+                ].map(item => (
+                  <div key={item.label} className="text-center p-3 rounded-xl bg-white/[0.025] border border-white/5">
+                    <p className={cn('font-orbitron font-bold text-lg', item.color)}>{item.value}</p>
+                    <p className="text-white/25 text-[10px] font-inter mt-0.5 uppercase tracking-wider">{item.label}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="p-4 rounded-xl bg-neon-magenta/5 border border-neon-magenta/15 mb-5">
+                <p className="text-neon-magenta text-xs font-semibold mb-2 flex items-center gap-1.5">
+                  <Zap size={12} /> Launch Dialog
                 </p>
-                <ul className="space-y-1.5 text-white/40 text-xs font-inter">
-                  {[
-                    'Test opens in fullscreen — do not exit',
-                    'Tab switching is monitored',
-                    'Copy/paste is disabled',
-                    'Auto-submits when time expires',
-                    'Cannot retake the same session',
-                  ].map((r) => (
-                    <li key={r} className="flex items-center gap-2">
-                      <span className="text-neon-amber opacity-60">▸</span> {r}
-                    </li>
-                  ))}
-                </ul>
+                <p className="text-white/35 text-xs font-inter">
+                  Clicking "Configure & Launch" opens the test configuration dialog where you can set the exact number of questions (5–100), time limit, and choose between proctored or normal mode.
+                </p>
               </div>
 
               {error && (
@@ -283,8 +294,8 @@ const TestSetupPage = () => {
                 <HoloButton variant="ghost" size="md" onClick={() => setStep(2)} icon={<ChevronLeft size={16} />}>
                   Back
                 </HoloButton>
-                <HoloButton variant="magenta" size="md" loading={loading} onClick={handleStart}>
-                  🚀 LAUNCH TEST
+                <HoloButton variant="magenta" size="md" onClick={() => setShowModal(true)} icon={<ChevronRight size={16} />}>
+                  Configure & Launch
                 </HoloButton>
               </div>
             </NeonCard>
@@ -297,10 +308,10 @@ const TestSetupPage = () => {
 
           <div className="space-y-4">
             {[
-              { label: 'Domain',     value: topic    || '—',                         color: 'neon-cyan' },
+              { label: 'Domain',     value: topic    || '—',                       color: 'neon-cyan' },
               { label: 'Difficulty', value: diff === 'all' ? 'Mixed' : diff.charAt(0).toUpperCase() + diff.slice(1), color: 'neon-violet' },
-              { label: 'Questions',  value: `${count} Q`,                            color: 'neon-green' },
-              { label: 'Time Limit', value: `${timeMin} minutes`,                    color: 'neon-amber' },
+              { label: 'Questions',  value: `${count} Q`,                          color: 'neon-green' },
+              { label: 'Est. Time',  value: `${timeMin} min`,                      color: 'neon-amber' },
             ].map((item) => (
               <div key={item.label} className="flex items-center justify-between p-3 rounded-lg bg-white/[0.025] border border-white/5">
                 <span className="text-white/30 text-xs font-inter">{item.label}</span>
@@ -310,7 +321,6 @@ const TestSetupPage = () => {
               </div>
             ))}
 
-            {/* Progress ring preview */}
             <div className="flex justify-center mt-4">
               <div className="relative">
                 <svg width={100} height={100} viewBox="0 0 100 100" className="-rotate-90">
@@ -331,6 +341,16 @@ const TestSetupPage = () => {
           </div>
         </NeonCard>
       </div>
+
+      {/* ── Start Test Modal ───────────────────────────────────── */}
+      <StartTestModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        onStart={handleLaunch}
+        loading={loading}
+        defaultCount={count}
+        defaultTime={timeMin}
+      />
     </AppLayout>
   );
 };
