@@ -16,6 +16,7 @@ import testRoutes from './routes/testRoutes';
 const app: Application = express();
 import uploadRoutes from './routes/uploadRoutes';
 import adminRoutes from './routes/adminRoutes';
+import scheduledTestRoutes from './routes/scheduledTestRoutes';
 
 // ─── Security Middleware ───────────────────────────────────────
 // helmet: Sets secure HTTP response headers (XSS, clickjacking protection)
@@ -77,11 +78,12 @@ app.get('/health', (_req: Request, res: Response) => {
 });
 
 // ─── API Routes ────────────────────────────────────────────────
-app.use('/api/auth', authRoutes);           // ✅ Step 3 LIVE
-app.use('/api/questions', questionRoutes);  // Step 5 mein fill hoga
-app.use('/api/tests', testRoutes);          // Step 6 mein fill hoga
-app.use('/api/upload', uploadRoutes);
-app.use('/api/admin', adminRoutes);  // ✅ Add karo
+app.use('/api/auth', authRoutes);                    // ✅ Auth
+app.use('/api/questions', questionRoutes);          // ✅ Questions
+app.use('/api/tests', testRoutes);                  // ✅ Tests
+app.use('/api/upload', uploadRoutes);               // ✅ Upload
+app.use('/api/admin', adminRoutes);                 // ✅ Admin stats
+app.use('/api/scheduled-tests', scheduledTestRoutes); // ✅ Scheduled Tests
 
 
 // ─── 404 Handler ──────────────────────────────────────────────
