@@ -5,18 +5,32 @@ import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IScheduledTest extends Document {
   title:          string;
+  testCode:       string;                       // Slug/code (auto-generated, editable)
   topic:          string;
   difficulty:     'easy' | 'medium' | 'hard' | 'all';
   questionCount:  number;
-  timeLimit:      number;        // in minutes
+  timeLimit:      number;                      // in minutes
   startTime:      Date;
+  endTime:        Date;                        // When test expires/becomes unavailable
+  oneAttemptOnly: boolean;                     // Only one attempt per student
+  sendNotification: boolean;                   // Send notification to students
   assignedStudents: mongoose.Types.ObjectId[];
   createdBy:      mongoose.Types.ObjectId;
   status:         'locked' | 'live' | 'completed';
-  uploadedQuestions?: string;    // reference to upload job / file path
-  customQuestions?: mongoose.Types.ObjectId[]; // exact uploaded questions for this test
+  customQuestions?: mongoose.Types.ObjectId[];
   createdAt:      Date;
   updatedAt:      Date;
+}
+
+// Helper function to generate test code from title
+function generateTestCode(title: string): string {
+  const slug = title
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w-]/g, '')
+    .substring(0, 50);
+
+  return slug || `test-${Date.now()}`;
 }
 
 const scheduledTestSchema = new Schema<IScheduledTest>(
@@ -26,10 +40,17 @@ const scheduledTestSchema = new Schema<IScheduledTest>(
       required: [true, 'Test title is required'],
       trim:     true,
     },
+    testCode: {
+      type:     String,
+      unique:   true,
+      sparse:   true,
+      trim:     true,
+      index:    true,
+    },
     topic: {
       type:     String,
       required: true,
-      enum:     ['Quantitative Aptitude', 'Verbal Ability', 'Logical Reasoning'],
+      trim:     true,
     },
     difficulty: {
       type:    String,
@@ -38,19 +59,29 @@ const scheduledTestSchema = new Schema<IScheduledTest>(
     },
     questionCount: {
       type:    Number,
-      min:     5,
-      max:     100,
+      min:     1,
       default: 30,
     },
     timeLimit: {
       type:    Number,
-      min:     10,
-      max:     180,
+      min:     1,
       default: 60,
     },
     startTime: {
       type:     Date,
       required: [true, 'Start time is required'],
+    },
+    endTime: {
+      type:     Date,
+      required: [true, 'End time is required'],
+    },
+    oneAttemptOnly: {
+      type:    Boolean,
+      default: true,
+    },
+    sendNotification: {
+      type:    Boolean,
+      default: true,
     },
     assignedStudents: [
       {
@@ -68,10 +99,6 @@ const scheduledTestSchema = new Schema<IScheduledTest>(
       enum:    ['locked', 'live', 'completed'],
       default: 'locked',
     },
-    uploadedQuestions: {
-      type: String,
-      default: null,
-    },
     customQuestions: [
       {
         type: Schema.Types.ObjectId,
@@ -82,11 +109,38 @@ const scheduledTestSchema = new Schema<IScheduledTest>(
   { timestamps: true }
 );
 
-// ── Virtual: derive real-time status from startTime ───────────────
+// ── Pre-save hook: Generate testCode if not provided ───────────
+scheduledTestSchema.pre('save', async function(next) {
+  if (this.testCode) {
+    next();
+    return;
+  }
+
+  const ScheduledTestModel = this.constructor as mongoose.Model<IScheduledTest>;
+  const baseCode = generateTestCode(this.title);
+  let candidate = baseCode;
+  let suffix = 1;
+
+  while (
+    await ScheduledTestModel.exists({
+      testCode: candidate,
+      _id: { $ne: this._id },
+    })
+  ) {
+    const suffixToken = `-${suffix}`;
+    candidate = `${baseCode.substring(0, 50 - suffixToken.length)}${suffixToken}`;
+    suffix += 1;
+  }
+
+  this.testCode = candidate;
+  next();
+});
+
+// ── Virtual: derive real-time status from startTime/endTime ─────
 scheduledTestSchema.virtual('currentStatus').get(function (this: IScheduledTest) {
   const now   = Date.now();
   const start = this.startTime.getTime();
-  const end   = start + this.timeLimit * 60_000;
+  const end   = this.endTime.getTime();
   if (now < start) return 'locked';
   if (now < end)   return 'live';
   return 'completed';

@@ -10,10 +10,10 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
+import path from 'path';
 import authRoutes from './routes/authRoutes';
 import questionRoutes from './routes/questionRoutes';
 import testRoutes from './routes/testRoutes';
-import uploadRoutes from './routes/uploadRoutes';
 import adminRoutes from './routes/adminRoutes';
 import scheduledTestRoutes from './routes/scheduledTestRoutes';
 import notificationRoutes from './routes/notificationRoutes';
@@ -60,6 +60,7 @@ app.use('/api', limiter); // Only apply to /api routes
 // ─── Request Parsing Middleware ────────────────────────────────
 app.use(express.json({ limit: '10mb' }));           // Parse JSON body
 app.use(express.urlencoded({ extended: true }));    // Parse URL-encoded body
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // ─── HTTP Request Logger ───────────────────────────────────────
 // morgan 'dev' mode: coloured logs in terminal → [GET] /api/auth/login 200 12ms
@@ -82,7 +83,6 @@ app.get('/health', (_req: Request, res: Response) => {
 app.use('/api/auth', authRoutes);                    // ✅ Auth
 app.use('/api/questions', questionRoutes);          // ✅ Questions
 app.use('/api/tests', testRoutes);                  // ✅ Tests
-app.use('/api/upload', uploadRoutes);               // ✅ Upload
 app.use('/api/admin', adminRoutes);                 // ✅ Admin stats
 app.use('/api/scheduled-tests', scheduledTestRoutes); // ✅ Scheduled Tests
 app.use('/api/notifications', notificationRoutes);  // ✅ Notifications

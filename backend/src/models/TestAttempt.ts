@@ -1,29 +1,28 @@
-// src/models/TestAttempt.ts
-import mongoose, { Schema, Document, Types } from 'mongoose';
+import mongoose, { Document, Schema, Types } from 'mongoose';
 
 interface IAnswer {
-  question: Types.ObjectId;      // Question model se reference
-  selectedOption: string;
+  question: Types.ObjectId;
+  selectedAnswer: string;
   isCorrect: boolean;
-  timeSpent: number;             // seconds mein
+  timeSpent: number;
 }
 
 export interface ITestAttempt extends Document {
   user: Types.ObjectId;
-  testType: 'topic-wise' | 'subtopic-wise' | 'full-mock' | 'custom';
-  title?: string;                // jaise "Mock Test 1" ya "Custom: Quant + Reasoning"
-  questions: Types.ObjectId[];   // is test mein kaunse questions the
-  answers: IAnswer[];            // user ne kya jawab diye
+  testType: 'practice' | 'mock' | 'sectional' | 'full' | 'custom';
+  title?: string;
+  questions: Types.ObjectId[];
+  answers: IAnswer[];
   score: number;
   totalQuestions: number;
-  correct: number;
-  incorrect: number;
-  skipped: number;
-  totalTime: number;             // total seconds
-  topicPerformance?: Map<string, { correct: number; total: number }>; // topic-wise stats
-  scheduledTest?: Types.ObjectId; // reference to ScheduledTest if this is a scheduled test attempt
+  correctCount: number;
+  incorrectCount: number;
+  skippedCount: number;
+  totalTime: number;
+  topicPerformance?: Map<string, { correct: number; total: number }>;
+  scheduledTest?: Types.ObjectId;
   createdAt: Date;
-  completedAt?: Date;
+  updatedAt: Date;
 }
 
 const testAttemptSchema = new Schema<ITestAttempt>(
@@ -36,36 +35,40 @@ const testAttemptSchema = new Schema<ITestAttempt>(
     testType: {
       type: String,
       enum: ['practice', 'mock', 'sectional', 'full', 'custom'],
-      
       required: true,
     },
     title: {
       type: String,
       trim: true,
     },
-    questions: [{
-      type: Schema.Types.ObjectId,
-      ref: 'Question',
-      required: true,
-    }],
-    answers: [{
-      question: { type: Schema.Types.ObjectId, ref: 'Question' },
-      selectedOption: String,
-      isCorrect: Boolean,
-      timeSpent: Number,
-    }],
+    questions: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'Question',
+        required: true,
+      },
+    ],
+    answers: [
+      {
+        question: { type: Schema.Types.ObjectId, ref: 'Question' },
+        selectedAnswer: String,
+        isCorrect: Boolean,
+        timeSpent: Number,
+      },
+    ],
     score: { type: Number, default: 0 },
     totalQuestions: { type: Number, required: true },
-    correct: { type: Number, default: 0 },
-    incorrect: { type: Number, default: 0 },
-    skipped: { type: Number, default: 0 },
-    totalTime: { type: Number },
+    correctCount: { type: Number, default: 0 },
+    incorrectCount: { type: Number, default: 0 },
+    skippedCount: { type: Number, default: 0 },
+    totalTime: { type: Number, default: 0 },
     topicPerformance: {
       type: Map,
       of: {
         correct: Number,
         total: Number,
       },
+      default: {},
     },
     scheduledTest: {
       type: Schema.Types.ObjectId,
