@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import {
-  Shield, BookOpen, Clock, Sliders, X, Zap, Camera, EyeOff,
+  Shield, BookOpen, Clock, Sliders, X, Camera, EyeOff,
   AlertTriangle, ChevronRight
 } from 'lucide-react';
 import HoloButton from './HoloButton';

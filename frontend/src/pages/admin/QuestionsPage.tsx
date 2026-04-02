@@ -1,568 +1,840 @@
-// frontend/src/pages/admin/QuestionsPage.tsx
-import { useEffect, useState } from 'react';
-import AdminLayout from '@/components/AdminLayout';
-import { getQuestionsAdminApi, deleteQuestionApi } from '@/api/adminApi';
+import { useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import {
+  Eye,
+  Filter,
+  Image as ImageIcon,
+  Plus,
+  Search,
+  SquarePen,
+  Trash2,
+  Upload,
+  X,
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import AdminLayout from '@/components/AdminLayout';
+import QuestionPreview from '@/components/QuestionPreview';
+import HoloButton from '@/components/ui/HoloButton';
+import {
+  AdminEmptyState,
+  AdminPage,
+  AdminPageHeader,
+  AdminPanel,
+  AdminStatusBadge,
+} from '@/components/admin/AdminUI';
+import {
+  bulkDeleteQuestionsApi,
+  deleteQuestionApi,
+  getQuestionsAdminApi,
+  updateQuestionApi,
+} from '@/api/adminApi';
+import { getAssetUrl, getOptionLetter } from '@/lib/question';
+import type { Question } from '@/types';
+
+type EditState = {
+  _id: string;
+  topic: string;
+  subtopic: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  questionText: string;
+  questionImage?: string;
+  options: Array<{ text: string; image?: string }>;
+  correctAnswer: 'A' | 'B' | 'C' | 'D';
+  explanation: string;
+};
 
 const TOPICS = ['', 'Quantitative Aptitude', 'Verbal Ability', 'Logical Reasoning'];
-const DIFFICULTIES = ['', 'easy', 'medium', 'hard'];
+const DIFFICULTY_TONE: Record<Question['difficulty'], 'green' | 'amber' | 'red'> = {
+  easy: 'green',
+  medium: 'amber',
+  hard: 'red',
+};
 
-/* ─── Styles ──────────────────────────────────────────────────── */
-const STYLES = `
-  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap');
+const buildEditState = (question: Question): EditState => ({
+  _id: question._id,
+  topic: question.topic,
+  subtopic: question.subtopic || '',
+  difficulty: question.difficulty,
+  questionText: question.questionText || '',
+  questionImage: question.questionImage,
+  options: question.options.map((option) => ({
+    text: option.text || '',
+    image: option.image,
+  })),
+  correctAnswer: question.correctAnswer || 'A',
+  explanation: question.explanation || '',
+});
 
-  :root {
-    --cyan:    #00f5ff;
-    --violet:  #7c3aed;
-    --magenta: #f000b8;
-    --dark:    #050b18;
-    --panel:   rgba(0,245,255,0.04);
-    --border:  rgba(0,245,255,0.13);
+const validateEdit = (state: EditState) => {
+  const issues: string[] = [];
+  if (!state.topic.trim()) issues.push('Topic is required.');
+  if (!state.questionText.trim() && !state.questionImage) {
+    issues.push('Question needs text or an image.');
   }
-
-  @keyframes scanline {
-    0%   { transform: translateY(-100%); }
-    100% { transform: translateY(100vh); }
-  }
-  @keyframes shimmer {
-    0%   { background-position: -200% center; }
-    100% { background-position:  200% center; }
-  }
-  @keyframes fadeSlideUp {
-    from { opacity:0; transform:translateY(24px); }
-    to   { opacity:1; transform:translateY(0);    }
-  }
-  @keyframes rowIn {
-    from { opacity:0; transform:translateX(-16px); }
-    to   { opacity:1; transform:translateX(0);     }
-  }
-  @keyframes pulse-ring {
-    0%   { transform:scale(1);   opacity:.6; }
-    70%  { transform:scale(1.6); opacity:0;  }
-    100% { transform:scale(1);   opacity:0;  }
-  }
-  @keyframes rotateHex {
-    from { transform: rotate(0deg);   }
-    to   { transform: rotate(360deg); }
-  }
-  @keyframes dataStream {
-    0%,100% { opacity:.3; }
-    50%     { opacity:1;  }
-  }
-  @keyframes deletePop {
-    0%   { transform:scale(1);    }
-    40%  { transform:scale(1.15); }
-    100% { transform:scale(1);    }
-  }
-
-  .qp-root {
-    font-family: 'Rajdhani', sans-serif;
-    background: var(--dark);
-    min-height: 100vh;
-    color: #e0f7fa;
-    position: relative;
-    overflow: hidden;
-  }
-  .qp-root::before {
-    content:'';
-    position:fixed; inset:0;
-    background-image:
-      linear-gradient(rgba(0,245,255,.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(0,245,255,.03) 1px, transparent 1px);
-    background-size: 40px 40px;
-    pointer-events:none; z-index:0;
-  }
-  .scanline {
-    position:fixed; left:0; right:0; height:2px;
-    background:linear-gradient(90deg,transparent,var(--cyan),transparent);
-    opacity:.12;
-    animation: scanline 4s linear infinite;
-    z-index:1; pointer-events:none;
-  }
-  .qp-wrap {
-    position:relative; z-index:2;
-    padding:2rem;
-    max-width:1200px;
-    margin:0 auto;
-  }
-
-  /* ── Header ── */
-  .qp-title {
-    font-family:'Orbitron',monospace;
-    font-weight:900;
-    font-size:clamp(1.4rem,3.5vw,2rem);
-    letter-spacing:.1em;
-    background:linear-gradient(90deg,var(--cyan),var(--magenta),var(--cyan));
-    background-size:200% auto;
-    -webkit-background-clip:text;
-    -webkit-text-fill-color:transparent;
-    animation:shimmer 3s linear infinite;
-  }
-  .qp-sub {
-    font-size:.78rem;
-    letter-spacing:.22em;
-    text-transform:uppercase;
-    color:rgba(0,245,255,.5);
-    margin-top:.2rem;
-    display:flex; align-items:center; gap:.5rem;
-  }
-  .status-dot {
-    display:inline-block;
-    width:7px; height:7px;
-    border-radius:50%;
-    background:var(--cyan);
-    position:relative;
-    flex-shrink:0;
-  }
-  .status-dot::after {
-    content:'';
-    position:absolute; inset:-4px;
-    border-radius:50%;
-    border:1px solid var(--cyan);
-    animation:pulse-ring 1.5s ease-out infinite;
-  }
-
-  /* ── Upload Button ── */
-  .upload-btn {
-    font-family:'Rajdhani',sans-serif;
-    font-weight:700;
-    font-size:.85rem;
-    letter-spacing:.12em;
-    text-transform:uppercase;
-    border:none; cursor:pointer;
-    border-radius:8px;
-    padding:.65rem 1.4rem;
-    background:linear-gradient(135deg,var(--cyan),var(--violet));
-    color:#fff;
-    box-shadow:0 0 20px rgba(0,245,255,.2);
-    position:relative; overflow:hidden;
-    transition:transform .2s, box-shadow .2s;
-  }
-  .upload-btn::before {
-    content:'';
-    position:absolute; inset:0;
-    background:linear-gradient(90deg,transparent,rgba(255,255,255,.15),transparent);
-    transform:translateX(-100%);
-    transition:transform .4s;
-  }
-  .upload-btn:hover::before { transform:translateX(100%); }
-  .upload-btn:hover {
-    transform:translateY(-3px);
-    box-shadow:0 8px 28px rgba(0,245,255,.3);
-  }
-  .upload-btn:active { transform:scale(.96); }
-
-  /* ── Filters ── */
-  .filter-row {
-    display:flex; flex-wrap:wrap; gap:.75rem;
-    animation:fadeSlideUp .4s ease both;
-    animation-delay:.1s;
-  }
-  .cyber-select {
-    font-family:'Rajdhani',sans-serif;
-    font-size:.85rem;
-    font-weight:600;
-    letter-spacing:.08em;
-    background:var(--panel);
-    border:1px solid var(--border);
-    border-radius:8px;
-    padding:.55rem 1rem;
-    color:#c0e8ff;
-    cursor:pointer;
-    appearance:none;
-    -webkit-appearance:none;
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='rgba(0,245,255,0.4)'/%3E%3C/svg%3E");
-    background-repeat:no-repeat;
-    background-position:right .75rem center;
-    padding-right:2.2rem;
-    transition:border-color .2s, box-shadow .2s;
-  }
-  .cyber-select:focus {
-    outline:none;
-    border-color:var(--cyan);
-    box-shadow:0 0 12px rgba(0,245,255,.15);
-  }
-  .cyber-select option {
-    background:#0d1a2e;
-    color:#c0e8ff;
-  }
-
-  /* ── Question Cards ── */
-  .q-card {
-    background:var(--panel);
-    border:1px solid var(--border);
-    border-radius:12px;
-    padding:1.25rem 1.4rem;
-    position:relative;
-    overflow:hidden;
-    animation:rowIn .4s ease both;
-    transition:transform .2s, box-shadow .2s, border-color .2s;
-  }
-  .q-card:hover {
-    transform:translateY(-3px);
-    border-color:rgba(0,245,255,.3);
-    box-shadow:0 0 28px rgba(0,245,255,.08), 0 4px 20px rgba(0,0,0,.4);
-  }
-  /* left accent bar */
-  .q-card::before {
-    content:'';
-    position:absolute; left:0; top:0; bottom:0; width:3px;
-    background:linear-gradient(180deg,var(--cyan),var(--violet));
-    border-radius:3px 0 0 3px;
-    opacity:0;
-    transition:opacity .25s;
-  }
-  .q-card:hover::before { opacity:1; }
-
-  .q-index {
-    font-family:'Orbitron',monospace;
-    font-size:.65rem;
-    color:rgba(0,245,255,.35);
-    letter-spacing:.15em;
-    margin-right:.5rem;
-  }
-
-  /* badges */
-  .badge {
-    display:inline-block;
-    font-size:.7rem;
-    font-weight:700;
-    letter-spacing:.1em;
-    text-transform:uppercase;
-    padding:.18rem .65rem;
-    border-radius:999px;
-    border:1px solid;
-  }
-  .badge-topic {
-    color:#818cf8;
-    border-color:rgba(129,140,248,.3);
-    background:rgba(129,140,248,.08);
-  }
-  .badge-subtopic {
-    color:rgba(0,245,255,.6);
-    border-color:rgba(0,245,255,.2);
-    background:rgba(0,245,255,.04);
-  }
-  .badge-easy   { color:#00f5aa; border-color:rgba(0,245,170,.35); background:rgba(0,245,170,.07); }
-  .badge-medium { color:#f5b800; border-color:rgba(245,184,0,.35);  background:rgba(245,184,0,.07); }
-  .badge-hard   { color:#ff3d6b; border-color:rgba(255,61,107,.35); background:rgba(255,61,107,.07); }
-
-  .q-text {
-    font-size:.95rem;
-    font-weight:600;
-    color:#d0eeff;
-    line-height:1.55;
-    margin:.55rem 0;
-  }
-
-  /* options */
-  .options-row { display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.4rem; }
-  .opt {
-    font-size:.78rem;
-    padding:.22rem .7rem;
-    border-radius:999px;
-    border:1px solid rgba(0,245,255,.1);
-    background:rgba(255,255,255,.03);
-    color:rgba(180,210,230,.7);
-    font-weight:600;
-    letter-spacing:.04em;
-    transition:background .2s;
-  }
-  .opt-correct {
-    border-color:rgba(0,245,170,.4);
-    background:rgba(0,245,170,.1);
-    color:#00f5aa;
-  }
-
-  /* delete button */
-  .del-btn {
-    font-family:'Rajdhani',sans-serif;
-    font-size:.8rem;
-    font-weight:700;
-    letter-spacing:.1em;
-    text-transform:uppercase;
-    background:rgba(255,61,107,.08);
-    border:1px solid rgba(255,61,107,.25);
-    color:#ff3d6b;
-    border-radius:8px;
-    padding:.5rem .9rem;
-    cursor:pointer;
-    flex-shrink:0;
-    transition:background .2s, box-shadow .2s, transform .15s;
-    white-space:nowrap;
-  }
-  .del-btn:hover:not(:disabled) {
-    background:rgba(255,61,107,.16);
-    box-shadow:0 0 14px rgba(255,61,107,.2);
-    animation:deletePop .3s ease;
-  }
-  .del-btn:disabled { opacity:.45; cursor:not-allowed; }
-
-  /* ── Empty State ── */
-  .empty-state {
-    background:var(--panel);
-    border:1px dashed var(--border);
-    border-radius:14px;
-    padding:3.5rem;
-    text-align:center;
-    animation:fadeSlideUp .4s ease;
-  }
-  .empty-icon { font-size:3rem; margin-bottom:1rem; opacity:.5; }
-  .empty-text {
-    font-family:'Orbitron',monospace;
-    font-size:.75rem;
-    letter-spacing:.25em;
-    color:rgba(0,245,255,.35);
-    text-transform:uppercase;
-  }
-
-  /* ── Loading ── */
-  .load-wrap {
-    display:flex; flex-direction:column;
-    align-items:center; justify-content:center;
-    padding:5rem 0; gap:1.2rem;
-  }
-  .hex-spin {
-    width:52px; height:52px;
-    border:3px solid transparent;
-    border-top-color:var(--cyan);
-    border-right-color:var(--magenta);
-    border-radius:50%;
-    animation:rotateHex 1s linear infinite;
-    box-shadow:0 0 18px rgba(0,245,255,.25);
-  }
-  .load-text {
-    font-family:'Orbitron',monospace;
-    font-size:.7rem;
-    letter-spacing:.3em;
-    color:var(--cyan);
-    text-transform:uppercase;
-    animation:dataStream 1.5s ease-in-out infinite;
-  }
-
-  /* ── Pagination ── */
-  .pagination {
-    display:flex; align-items:center; justify-content:center; gap:.75rem;
-    padding-top:1.5rem;
-    animation:fadeSlideUp .5s ease;
-  }
-  .page-btn {
-    font-family:'Rajdhani',sans-serif;
-    font-size:.82rem;
-    font-weight:700;
-    letter-spacing:.1em;
-    text-transform:uppercase;
-    background:var(--panel);
-    border:1px solid var(--border);
-    color:rgba(0,245,255,.7);
-    border-radius:8px;
-    padding:.5rem 1.1rem;
-    cursor:pointer;
-    transition:all .2s;
-  }
-  .page-btn:hover:not(:disabled) {
-    border-color:rgba(0,245,255,.4);
-    color:var(--cyan);
-    box-shadow:0 0 14px rgba(0,245,255,.12);
-    transform:translateY(-2px);
-  }
-  .page-btn:disabled { opacity:.3; cursor:not-allowed; }
-  .page-info {
-    font-family:'Orbitron',monospace;
-    font-size:.7rem;
-    letter-spacing:.2em;
-    color:rgba(0,245,255,.45);
-    padding:0 .5rem;
-  }
-
-  /* stagger rows */
-  .q-list > .q-card:nth-child(1)  { animation-delay:.04s; }
-  .q-list > .q-card:nth-child(2)  { animation-delay:.08s; }
-  .q-list > .q-card:nth-child(3)  { animation-delay:.12s; }
-  .q-list > .q-card:nth-child(4)  { animation-delay:.16s; }
-  .q-list > .q-card:nth-child(5)  { animation-delay:.20s; }
-  .q-list > .q-card:nth-child(6)  { animation-delay:.24s; }
-  .q-list > .q-card:nth-child(7)  { animation-delay:.28s; }
-  .q-list > .q-card:nth-child(8)  { animation-delay:.32s; }
-  .q-list > .q-card:nth-child(9)  { animation-delay:.36s; }
-  .q-list > .q-card:nth-child(10) { animation-delay:.40s; }
-`;
-
-const DIFF_CLASS: Record<string, string> = {
-  easy: 'badge-easy',
-  medium: 'badge-medium',
-  hard: 'badge-hard',
+  state.options.forEach((option, index) => {
+    if (!option.text.trim() && !option.image) {
+      issues.push(`Option ${getOptionLetter(index)} needs text or an image.`);
+    }
+  });
+  return issues;
 };
 
 const QuestionsPage = () => {
   const navigate = useNavigate();
-  const [questions, setQuestions]   = useState<any[]>([]);
-  const [isLoading, setLoading]     = useState(true);
-  const [page, setPage]             = useState(1);
-  const [total, setTotal]           = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [topic, setTopic]           = useState('');
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [topic, setTopic] = useState('');
+  const [subtopic, setSubtopic] = useState('');
   const [difficulty, setDifficulty] = useState('');
-  const [deleting, setDeleting]     = useState<string | null>(null);
+  const [previewQuestion, setPreviewQuestion] = useState<Question | null>(null);
+  const [editState, setEditState] = useState<EditState | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState('');
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(
+    null
+  );
 
   const fetchQuestions = async () => {
-    setLoading(true);
+    setIsLoading(true);
     try {
-      const r = await getQuestionsAdminApi(page, 10, topic, difficulty);
-      if (r.success && r.data) {
-        setQuestions(r.data.questions);
-        setTotal(r.data.pagination?.totalQuestions || 0);
-        setTotalPages(r.data.pagination?.totalPages || 1);
+      const response = await getQuestionsAdminApi(1, 150, topic, difficulty);
+      if (response.success && response.data) {
+        setQuestions(response.data.questions || []);
       }
-    } catch (e) { console.error(e); }
-    finally { setLoading(false); }
+    } catch {
+      setNotice({ type: 'error', message: 'Question bank could not be loaded right now.' });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  useEffect(() => { fetchQuestions(); }, [page, topic, difficulty]);
+  useEffect(() => {
+    fetchQuestions();
+  }, [topic, difficulty]);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Delete this question from the system?')) return;
-    setDeleting(id);
+  const availableSubtopics = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          questions
+            .map((question) => question.subtopic?.trim())
+            .filter((value): value is string => Boolean(value))
+        )
+      ).sort(),
+    [questions]
+  );
+
+  const filteredQuestions = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+    return questions.filter((question) => {
+      if (subtopic && question.subtopic !== subtopic) return false;
+      if (!keyword) return true;
+      const haystack = [
+        question.topic,
+        question.subtopic,
+        question.questionText,
+        question.explanation,
+        ...question.options.map((option) => option.text),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(keyword);
+    });
+  }, [questions, search, subtopic]);
+
+  const imageCount = filteredQuestions.filter(
+    (question) =>
+      Boolean(question.questionImage) || question.options.some((option) => Boolean(option.image))
+  ).length;
+
+  const bulkDeleteScopeLabel = useMemo(() => {
+    if (!topic) {
+      return 'Select a topic first. You can optionally narrow the delete scope with subtopic and difficulty.';
+    }
+
+    const segments = [topic];
+    if (subtopic) segments.push(subtopic);
+    if (difficulty) segments.push(`${difficulty} difficulty`);
+    return `This will target ${segments.join(' / ')} across the question bank.`;
+  }, [difficulty, subtopic, topic]);
+
+  const bulkDeleteLoadedCount = useMemo(
+    () =>
+      questions.filter((question) => {
+        if (!topic || question.topic !== topic) return false;
+        if (subtopic && question.subtopic !== subtopic) return false;
+        return true;
+      }).length,
+    [questions, subtopic, topic]
+  );
+
+  const clearFilters = () => {
+    setSearch('');
+    setTopic('');
+    setSubtopic('');
+    setDifficulty('');
+  };
+
+  const handleDelete = async (questionId: string) => {
+    if (!window.confirm('Delete this question from the bank?')) return;
+    setBusyId(questionId);
+    setNotice(null);
     try {
-      await deleteQuestionApi(id);
-      fetchQuestions();
-    } catch (e) { console.error(e); }
-    finally { setDeleting(null); }
+      await deleteQuestionApi(questionId);
+      setQuestions((current) => current.filter((question) => question._id !== questionId));
+      setNotice({ type: 'success', message: 'Question removed from the bank.' });
+    } catch (error: any) {
+      setNotice({
+        type: 'error',
+        message:
+          error?.response?.data?.message || 'Question could not be deleted.',
+      });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!topic) {
+      setNotice({ type: 'error', message: 'Select a topic before using bulk delete.' });
+      return;
+    }
+
+    const scope = [topic, subtopic || null, difficulty ? `${difficulty} difficulty` : null]
+      .filter(Boolean)
+      .join(' / ');
+
+    const confirmed = window.confirm(
+      `Delete all questions in ${scope}? Questions already used in scheduled tests or past attempts will be protected. This action cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    setBulkDeleting(true);
+    setNotice(null);
+
+    try {
+      const response = await bulkDeleteQuestionsApi({
+        topic,
+        ...(subtopic && { subtopic }),
+        ...(difficulty && { difficulty }),
+      });
+
+      if (response.success) {
+        setPreviewQuestion(null);
+        setEditState(null);
+        setNotice({ type: 'success', message: response.message });
+        await fetchQuestions();
+      } else {
+        setNotice({
+          type: 'error',
+          message: response.message || 'Bulk delete could not be completed.',
+        });
+      }
+    } catch (error: any) {
+      setNotice({
+        type: 'error',
+        message:
+          error?.response?.data?.message || 'Bulk delete could not be completed.',
+      });
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editState) return;
+    const issues = validateEdit(editState);
+    if (issues.length > 0) {
+      setEditError(issues.join(' '));
+      return;
+    }
+
+    setSavingEdit(true);
+    setEditError('');
+    try {
+      const response = await updateQuestionApi(editState._id, {
+        topic: editState.topic.trim(),
+        subtopic: editState.subtopic.trim() || undefined,
+        difficulty: editState.difficulty,
+        questionText: editState.questionText.trim() || undefined,
+        questionImage: editState.questionImage,
+        options: editState.options.map((option) => ({
+          text: option.text.trim() || undefined,
+          image: option.image,
+        })),
+        correctAnswer: editState.correctAnswer,
+        explanation: editState.explanation.trim() || undefined,
+      });
+
+      if (response.success && response.data) {
+        setQuestions((current) =>
+          current.map((question) => (question._id === editState._id ? response.data : question))
+        );
+        setEditState(null);
+        setNotice({ type: 'success', message: 'Question updated successfully.' });
+      } else {
+        setEditError(response.message || 'Question could not be updated.');
+      }
+    } catch (error: any) {
+      setEditError(error?.response?.data?.message || 'Question could not be updated.');
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   return (
-    <>
-      <style>{STYLES}</style>
-      <AdminLayout>
-        <div className="qp-root">
-          <div className="scanline" />
-          <div className="qp-wrap">
+    <AdminLayout>
+      <AdminPage>
+        {previewQuestion && (
+          <QuestionPreview
+            questions={[previewQuestion]}
+            onClose={() => setPreviewQuestion(null)}
+            title="Question Preview"
+            subtitle="This is the exact student-facing presentation from the bank."
+          />
+        )}
 
-            {/* ── Header ── */}
-            <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexWrap:'wrap', gap:'1rem', marginBottom:'1.75rem', animation:'fadeSlideUp .4s ease' }}>
-              <div>
-                <div className="qp-title">Questions Manager</div>
-                <div className="qp-sub">
-                  <span className="status-dot" />
-                  {total} Records in Database
-                </div>
-              </div>
-              <button className="upload-btn" onClick={() => navigate('/admin/upload')}>
-                📤 Upload More
-              </button>
+        <AdminPageHeader
+          eyebrow="Question Operations"
+          title={
+            <>
+              Question <span className="gradient-text-cyan-violet">Bank</span>
+            </>
+          }
+          description="Search the bank, filter by topic and difficulty, preview mixed-format questions, and edit or retire entries without leaving the new admin suite."
+          actions={
+            <>
+              <HoloButton
+                variant="ghost"
+                size="md"
+                icon={<Upload size={16} />}
+                onClick={() => navigate('/admin/upload')}
+              >
+                Bulk Upload
+              </HoloButton>
+              <HoloButton
+                variant="cyan"
+                size="md"
+                icon={<Plus size={16} />}
+                onClick={() => navigate('/admin/upload')}
+              >
+                Create New
+              </HoloButton>
+            </>
+          }
+        />
+
+        <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr_0.7fr]">
+          <AdminPanel tone="cyan" title="Search Deck" description="Scan question text, explanations, and option copy.">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/28" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                className="admin-input px-12 py-3.5 text-sm"
+                placeholder="Search question text, topic, explanation, or options..."
+              />
             </div>
+          </AdminPanel>
 
-            {/* ── Filters ── */}
-            <div className="filter-row" style={{ marginBottom:'1.5rem' }}>
+          <AdminPanel tone="violet" title="Filters" description="Focus on one topic cluster or difficulty band.">
+            <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-1">
               <select
-                className="cyber-select"
                 value={topic}
-                onChange={(e) => { setTopic(e.target.value); setPage(1); }}
+                onChange={(event) => {
+                  setTopic(event.target.value);
+                  setSubtopic('');
+                }}
+                className="admin-input admin-select px-4 py-3 text-sm"
               >
                 <option value="">All Topics</option>
-                {TOPICS.filter(Boolean).map((t) => (
-                  <option key={t} value={t}>{t}</option>
+                {TOPICS.filter(Boolean).map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
                 ))}
               </select>
               <select
-                className="cyber-select"
-                value={difficulty}
-                onChange={(e) => { setDifficulty(e.target.value); setPage(1); }}
+                value={subtopic}
+                onChange={(event) => setSubtopic(event.target.value)}
+                className="admin-input admin-select px-4 py-3 text-sm"
               >
-                <option value="">All Difficulties</option>
-                {DIFFICULTIES.filter(Boolean).map((d) => (
-                  <option key={d} value={d}>{d.charAt(0).toUpperCase() + d.slice(1)}</option>
+                <option value="">All Subtopics</option>
+                {availableSubtopics.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
                 ))}
               </select>
+              <select
+                value={difficulty}
+                onChange={(event) => setDifficulty(event.target.value)}
+                className="admin-input admin-select px-4 py-3 text-sm"
+              >
+                <option value="">All Difficulties</option>
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+              </select>
             </div>
+          </AdminPanel>
 
-            {/* ── Content ── */}
-            {isLoading ? (
-              <div className="load-wrap">
-                <div className="hex-spin" />
-                <div className="load-text">Fetching Questions…</div>
+          <AdminPanel tone="amber" title="Signal" description="Instant visibility into the filtered view.">
+            <div className="space-y-3">
+              <div className="rounded-[22px] border border-white/8 bg-white/[0.03] px-4 py-4">
+                <p className="text-[11px] uppercase tracking-[0.3em] text-white/30">Results</p>
+                <p className="mt-2 font-orbitron text-3xl tracking-[0.08em] text-neon-amber">
+                  {filteredQuestions.length}
+                </p>
               </div>
-            ) : questions.length === 0 ? (
-              <div className="empty-state">
-                <div className="empty-icon">📭</div>
-                <div className="empty-text">No Questions Found</div>
+              <div className="rounded-[22px] border border-white/8 bg-white/[0.03] px-4 py-4">
+                <p className="text-[11px] uppercase tracking-[0.3em] text-white/30">Image Rich</p>
+                <p className="mt-2 font-orbitron text-3xl tracking-[0.08em] text-neon-cyan">
+                  {imageCount}
+                </p>
               </div>
-            ) : (
-              <div className="q-list" style={{ display:'flex', flexDirection:'column', gap:'.75rem' }}>
-                {questions.map((q, idx) => (
-                  <div key={q._id} className="q-card">
-                    <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:'1rem' }}>
-                      <div style={{ flex:1, minWidth:0 }}>
+              <div className="rounded-[22px] border border-neon-red/18 bg-neon-red/7 px-4 py-4">
+                <p className="text-[11px] uppercase tracking-[0.3em] text-neon-red/80">
+                  Bulk Delete
+                </p>
+                <p className="mt-2 text-sm leading-6 text-white/62">{bulkDeleteScopeLabel}</p>
+                <p className="mt-2 text-xs text-white/35">
+                  {topic
+                    ? `${bulkDeleteLoadedCount} loaded questions match this scope right now.`
+                    : 'Choose a topic to unlock the delete action.'}
+                </p>
+                <p className="mt-2 text-xs text-white/35">
+                  Protected questions already used in scheduled tests or past attempts will be skipped automatically.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleBulkDelete}
+                  disabled={!topic || bulkDeleting}
+                  className="mt-4 w-full rounded-[18px] border border-neon-red/25 bg-neon-red/12 px-4 py-3 text-sm font-medium text-neon-red transition-all hover:shadow-[0_0_24px_rgba(255,51,102,0.18)] disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  {bulkDeleting ? 'Deleting Scoped Questions...' : 'Delete Topic/Subtopic Slice'}
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="w-full rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white/70 transition-all hover:border-white/18 hover:text-white"
+              >
+                Reset Filters
+              </button>
+            </div>
+          </AdminPanel>
+        </div>
 
-                        {/* badges row */}
-                        <div style={{ display:'flex', flexWrap:'wrap', alignItems:'center', gap:'.4rem', marginBottom:'.5rem' }}>
-                          <span className="q-index">#{(page - 1) * 10 + idx + 1}</span>
-                          <span className="badge badge-topic">{q.topic}</span>
-                          {q.subtopic && (
-                            <span className="badge badge-subtopic">{q.subtopic}</span>
-                          )}
-                          <span className={`badge ${DIFF_CLASS[q.difficulty] || 'badge-topic'}`}>
-                            {q.difficulty}
-                          </span>
-                        </div>
+        {notice ? (
+          <div
+            className={`rounded-[22px] border px-4 py-3 text-sm ${
+              notice.type === 'success'
+                ? 'border-neon-green/25 bg-neon-green/8 text-neon-green'
+                : 'border-neon-red/25 bg-neon-red/8 text-neon-red'
+            }`}
+          >
+            {notice.message}
+          </div>
+        ) : null}
 
-                        {/* question text */}
-                        <p className="q-text">{q.questionText}</p>
-
-                        {/* options */}
-                        <div className="options-row">
-                          {q.options.map((opt: string, i: number) => (
-                            <span
-                              key={i}
-                              className={`opt ${opt === q.correctAnswer ? 'opt-correct' : ''}`}
-                            >
-                              {['A','B','C','D'][i]}) {opt}
-                            </span>
-                          ))}
-                        </div>
+        {isLoading ? (
+          <AdminPanel tone="cyan" title="Loading Bank" description="Gathering the latest question records.">
+            <div className="flex min-h-[320px] flex-col items-center justify-center gap-5">
+              <div className="h-14 w-14 rounded-full border-2 border-neon-cyan/30 border-t-neon-cyan animate-spin" />
+              <p className="font-orbitron text-xs uppercase tracking-[0.34em] text-neon-cyan/80">
+                Parsing the question bank
+              </p>
+            </div>
+          </AdminPanel>
+        ) : filteredQuestions.length === 0 ? (
+          <AdminEmptyState
+            title="No questions match the current filters"
+            description="Clear the active filters or create a fresh question through the new builder."
+            icon={<Filter className="h-6 w-6" />}
+            action={
+              <HoloButton
+                variant="cyan"
+                size="md"
+                icon={<Plus size={16} />}
+                onClick={() => navigate('/admin/upload')}
+              >
+                Launch Builder
+              </HoloButton>
+            }
+          />
+        ) : (
+          <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+            {filteredQuestions.map((question) => (
+              <motion.article
+                key={question._id}
+                whileHover={{ y: -6, scale: 1.01 }}
+                transition={{ duration: 0.24 }}
+                className="admin-panel p-5"
+              >
+                <div className="relative z-[1] space-y-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <AdminStatusBadge tone="cyan">{question.topic}</AdminStatusBadge>
+                        {question.subtopic ? (
+                          <AdminStatusBadge tone="default">{question.subtopic}</AdminStatusBadge>
+                        ) : null}
+                        <AdminStatusBadge tone={DIFFICULTY_TONE[question.difficulty]}>
+                          {question.difficulty}
+                        </AdminStatusBadge>
                       </div>
-
-                      {/* delete */}
+                      <p className="text-sm leading-7 text-white/88">
+                        {question.questionText || 'Image-led question'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
                       <button
-                        className="del-btn"
-                        onClick={() => handleDelete(q._id)}
-                        disabled={deleting === q._id}
+                        type="button"
+                        onClick={() => setPreviewQuestion(question)}
+                        className="grid h-11 w-11 place-items-center rounded-2xl border border-white/10 bg-white/[0.04] text-white/72 transition-all hover:border-neon-cyan/24 hover:text-neon-cyan"
                       >
-                        {deleting === q._id ? '⏳' : '🗑 Delete'}
+                        <Eye className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditError('');
+                          setEditState(buildEditState(question));
+                        }}
+                        className="grid h-11 w-11 place-items-center rounded-2xl border border-white/10 bg-white/[0.04] text-white/72 transition-all hover:border-neon-magenta/24 hover:text-neon-magenta"
+                      >
+                        <SquarePen className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(question._id)}
+                        disabled={busyId === question._id}
+                        className="grid h-11 w-11 place-items-center rounded-2xl border border-neon-red/20 bg-neon-red/10 text-neon-red transition-all hover:shadow-[0_0_24px_rgba(255,51,102,0.2)] disabled:opacity-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
 
-            {/* ── Pagination ── */}
-            {totalPages > 1 && (
-              <div className="pagination">
-                <button
-                  className="page-btn"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                >
-                  ← Prev
-                </button>
-                <span className="page-info">
-                  {page} / {totalPages}
-                </span>
-                <button
-                  className="page-btn"
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                >
-                  Next →
-                </button>
-              </div>
-            )}
+                  {question.questionImage ? (
+                    <img
+                      src={getAssetUrl(question.questionImage)}
+                      alt="Question"
+                      className="h-44 w-full rounded-[22px] border border-white/8 object-contain"
+                    />
+                  ) : null}
 
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {question.options.map((option, index) => {
+                      const optionLetter = getOptionLetter(index);
+                      const isCorrect = optionLetter === question.correctAnswer;
+                      return (
+                        <div
+                          key={`${question._id}-${optionLetter}`}
+                          className={`rounded-[20px] border p-3 ${
+                            isCorrect
+                              ? 'border-neon-green/22 bg-neon-green/8'
+                              : 'border-white/8 bg-white/[0.03]'
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <span className="font-orbitron text-xs tracking-[0.18em] text-white/40">
+                              {optionLetter}
+                            </span>
+                            <div className="flex-1 space-y-2">
+                              {option.text ? (
+                                <p className="text-sm leading-6 text-white/78">{option.text}</p>
+                              ) : null}
+                              {option.image ? (
+                                <div className="flex items-center gap-2 rounded-2xl border border-white/8 bg-black/15 p-2">
+                                  <ImageIcon className="h-4 w-4 text-neon-cyan" />
+                                  <img
+                                    src={getAssetUrl(option.image)}
+                                    alt={`Option ${optionLetter}`}
+                                    className="h-16 max-w-[120px] rounded-xl object-contain"
+                                  />
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {question.explanation ? (
+                    <div className="rounded-[20px] border border-neon-cyan/14 bg-neon-cyan/6 px-4 py-3">
+                      <p className="text-[11px] uppercase tracking-[0.28em] text-neon-cyan/75">
+                        Explanation
+                      </p>
+                      <p className="mt-2 text-sm leading-6 text-white/56">{question.explanation}</p>
+                    </div>
+                  ) : null}
+                </div>
+              </motion.article>
+            ))}
           </div>
-        </div>
-      </AdminLayout>
-    </>
+        )}
+
+        <AnimatePresence>
+          {editState && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-[#030611]/88 px-4 py-6 backdrop-blur-md"
+            >
+              <motion.div
+                initial={{ opacity: 0, y: 18, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 18, scale: 0.98 }}
+                transition={{ duration: 0.24 }}
+                className="max-h-[92vh] w-full max-w-6xl overflow-hidden"
+              >
+                <AdminPanel
+                  tone="magenta"
+                  title="Edit Question"
+                  description="Adjust text, metadata, explanations, and option copy while preserving the existing image assets."
+                  actions={
+                    <button
+                      type="button"
+                      onClick={() => setEditState(null)}
+                      className="grid h-11 w-11 place-items-center rounded-2xl border border-white/10 bg-white/[0.05] text-white/70 transition-all hover:border-white/20 hover:text-white"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  }
+                  className="max-h-[92vh]"
+                >
+                  <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+                    <div className="max-h-[72vh] space-y-4 overflow-y-auto pr-1">
+                      <div className="grid gap-4 md:grid-cols-3">
+                        <input
+                          value={editState.topic}
+                          onChange={(event) =>
+                            setEditState((current) =>
+                              current ? { ...current, topic: event.target.value } : current
+                            )
+                          }
+                          className="admin-input px-4 py-3 text-sm"
+                          placeholder="Topic"
+                        />
+                        <input
+                          value={editState.subtopic}
+                          onChange={(event) =>
+                            setEditState((current) =>
+                              current ? { ...current, subtopic: event.target.value } : current
+                            )
+                          }
+                          className="admin-input px-4 py-3 text-sm"
+                          placeholder="Subtopic"
+                        />
+                        <select
+                          value={editState.difficulty}
+                          onChange={(event) =>
+                            setEditState((current) =>
+                              current
+                                ? {
+                                    ...current,
+                                    difficulty: event.target.value as EditState['difficulty'],
+                                  }
+                                : current
+                            )
+                          }
+                          className="admin-input admin-select px-4 py-3 text-sm"
+                        >
+                          <option value="easy">Easy</option>
+                          <option value="medium">Medium</option>
+                          <option value="hard">Hard</option>
+                        </select>
+                      </div>
+
+                      <textarea
+                        value={editState.questionText}
+                        onChange={(event) =>
+                          setEditState((current) =>
+                            current ? { ...current, questionText: event.target.value } : current
+                          )
+                        }
+                        className="admin-input min-h-[160px] px-4 py-3 text-sm"
+                        placeholder="Question text"
+                      />
+
+                      <div className="grid gap-4 md:grid-cols-2">
+                        {editState.options.map((option, index) => (
+                          <div
+                            key={`${editState._id}-${index}`}
+                            className="rounded-[22px] border border-white/8 bg-white/[0.035] p-4"
+                          >
+                            <p className="mb-3 font-orbitron text-xs tracking-[0.22em] text-white/60">
+                              Option {getOptionLetter(index)}
+                            </p>
+                            <textarea
+                              value={option.text}
+                              onChange={(event) =>
+                                setEditState((current) =>
+                                  current
+                                    ? {
+                                        ...current,
+                                        options: current.options.map((entry, entryIndex) =>
+                                          entryIndex === index
+                                            ? { ...entry, text: event.target.value }
+                                            : entry
+                                        ),
+                                      }
+                                    : current
+                                )
+                              }
+                              className="admin-input min-h-[110px] px-4 py-3 text-sm"
+                            />
+                            {option.image ? (
+                              <img
+                                src={getAssetUrl(option.image)}
+                                alt={`Option ${getOptionLetter(index)}`}
+                                className="mt-3 h-24 w-full rounded-2xl border border-white/8 object-contain"
+                              />
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="grid gap-4 md:grid-cols-[0.6fr_1.4fr]">
+                        <select
+                          value={editState.correctAnswer}
+                          onChange={(event) =>
+                            setEditState((current) =>
+                              current
+                                ? {
+                                    ...current,
+                                    correctAnswer: event.target.value as EditState['correctAnswer'],
+                                  }
+                                : current
+                            )
+                          }
+                          className="admin-input admin-select px-4 py-3 text-sm"
+                        >
+                          <option value="A">A</option>
+                          <option value="B">B</option>
+                          <option value="C">C</option>
+                          <option value="D">D</option>
+                        </select>
+                        <textarea
+                          value={editState.explanation}
+                          onChange={(event) =>
+                            setEditState((current) =>
+                              current ? { ...current, explanation: event.target.value } : current
+                            )
+                          }
+                          className="admin-input min-h-[120px] px-4 py-3 text-sm"
+                          placeholder="Explanation"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="rounded-[26px] border border-white/8 bg-white/[0.035] p-5">
+                        <div className="mb-4 flex items-center justify-between">
+                          <p className="font-orbitron text-sm tracking-[0.16em] text-white">
+                            Student Preview
+                          </p>
+                          <AdminStatusBadge tone={DIFFICULTY_TONE[editState.difficulty]}>
+                            {editState.difficulty}
+                          </AdminStatusBadge>
+                        </div>
+                        <div className="space-y-3">
+                          <div className="rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
+                            <p className="text-xs uppercase tracking-[0.24em] text-white/32">
+                              {editState.topic}
+                              {editState.subtopic ? ` / ${editState.subtopic}` : ''}
+                            </p>
+                            {editState.questionText ? (
+                              <p className="mt-3 text-sm leading-7 text-white/88">
+                                {editState.questionText}
+                              </p>
+                            ) : null}
+                            {editState.questionImage ? (
+                              <img
+                                src={getAssetUrl(editState.questionImage)}
+                                alt="Question"
+                                className="mt-4 max-h-56 w-full rounded-[20px] border border-white/8 object-contain"
+                              />
+                            ) : null}
+                          </div>
+
+                          {editState.options.map((option, index) => {
+                            const optionLetter = getOptionLetter(index);
+                            return (
+                              <div
+                                key={`${editState._id}-preview-${optionLetter}`}
+                                className={`rounded-[20px] border p-4 ${
+                                  optionLetter === editState.correctAnswer
+                                    ? 'border-neon-green/25 bg-neon-green/8'
+                                    : 'border-white/8 bg-white/[0.03]'
+                                }`}
+                              >
+                                <div className="flex items-start gap-3">
+                                  <span className="font-orbitron text-xs tracking-[0.2em] text-white/45">
+                                    {optionLetter}
+                                  </span>
+                                  <div className="flex-1 space-y-2">
+                                    {option.text ? (
+                                      <p className="text-sm leading-6 text-white/78">{option.text}</p>
+                                    ) : null}
+                                    {option.image ? (
+                                      <img
+                                        src={getAssetUrl(option.image)}
+                                        alt={`Option ${optionLetter}`}
+                                        className="max-h-24 rounded-2xl border border-white/8 object-contain"
+                                      />
+                                    ) : null}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {editError ? (
+                        <div className="rounded-[22px] border border-neon-red/25 bg-neon-red/8 px-4 py-3 text-sm text-neon-red">
+                          {editError}
+                        </div>
+                      ) : null}
+
+                      <div className="flex gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setEditState(null)}
+                          className="flex-1 rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white/70 transition-all hover:border-white/18 hover:text-white"
+                        >
+                          Close
+                        </button>
+                        <HoloButton
+                          variant="magenta"
+                          size="lg"
+                          onClick={handleSaveEdit}
+                          loading={savingEdit}
+                          icon={<SquarePen size={16} />}
+                          className="flex-1"
+                        >
+                          Save Update
+                        </HoloButton>
+                      </div>
+                    </div>
+                  </div>
+                </AdminPanel>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </AdminPage>
+    </AdminLayout>
   );
 };
 

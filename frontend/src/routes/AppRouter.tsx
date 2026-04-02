@@ -29,6 +29,8 @@ import UploadQuestionsPage from '@/pages/admin/UploadQuestionsPage';
 import QuestionsPage       from '@/pages/admin/QuestionsPage';
 import UsersPage           from '@/pages/admin/UsersPage';
 import CreateTestPage      from '@/pages/admin/CreateTestPage';
+import CreateFullLengthTestPage from '@/pages/admin/CreateFullLengthTestPage';
+import ManageTestsPage     from '@/pages/admin/ManageTestsPage';
 
 // ── 404 ───────────────────────────────────────────────────────────
 import NotFoundPage from '@/pages/NotFoundPage';
@@ -64,11 +66,13 @@ const AppRouter = () => {
 
       {/* ── Admin Only Routes ──────────────────────────────────── */}
       <Route element={<ProtectedRoute adminOnly={true} />}>
-        <Route path="/admin"              element={<AdminDashboard />} />
-        <Route path="/admin/upload"       element={<UploadQuestionsPage />} />
-        <Route path="/admin/questions"    element={<QuestionsPage />} />
-        <Route path="/admin/users"        element={<UsersPage />} />
-        <Route path="/admin/create-test"  element={<CreateTestPage />} />
+        <Route path="/admin"                     element={<AdminDashboard />} />
+        <Route path="/admin/upload"              element={<UploadQuestionsPage />} />
+        <Route path="/admin/questions"           element={<QuestionsPage />} />
+        <Route path="/admin/users"               element={<UsersPage />} />
+        <Route path="/admin/create-test"         element={<CreateTestPage />} />
+        <Route path="/admin/manage-tests"        element={<ManageTestsPage />} />
+        <Route path="/admin/create-full-length-test" element={<CreateFullLengthTestPage />} />
       </Route>
 
       {/* ── 404 ─────────────────────────────────────────────────── */}

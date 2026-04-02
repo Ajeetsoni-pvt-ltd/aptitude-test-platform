@@ -60,6 +60,7 @@ export const startScheduledTestApi = async (
   title: string;
   totalQuestions: number;
   questions: Question[];
+  durationSeconds: number;
 }>> => {
   const response = await apiClient.post(`/scheduled-tests/${scheduledTestId}/start`);
   return response.data;

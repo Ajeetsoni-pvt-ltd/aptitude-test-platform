@@ -9,6 +9,7 @@ import { getAttemptByIdApi } from '@/api/testApi';
 import { ChevronLeft, CheckCircle2, XCircle, AlertTriangle, Lightbulb } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { TestAttempt, Question } from '@/types';
+import { getAssetUrl, getOptionLetter } from '@/lib/question';
 
 // Extend TestAttempt to match the populated questions structure
 interface PopulatedAttempt extends TestAttempt {
@@ -144,16 +145,30 @@ const SolutionReviewPage = () => {
                   </span>
                 </div>
 
-                {/* Question Text */}
-                <p className="text-white/90 text-sm md:text-base font-inter leading-relaxed mb-6">
-                  {q.questionText}
-                </p>
+                {(q.questionText || q.questionImage) && (
+                  <div className="space-y-4 mb-6">
+                    {q.questionText && (
+                      <p className="text-white/90 text-sm md:text-base font-inter leading-relaxed">
+                        {q.questionText}
+                      </p>
+                    )}
+                    {q.questionImage && (
+                      <img
+                        src={getAssetUrl(q.questionImage)}
+                        alt="Question"
+                        className="max-w-full max-h-72 rounded-lg object-contain border border-white/10"
+                        loading="lazy"
+                      />
+                    )}
+                  </div>
+                )}
 
                 {/* Options */}
                 <div className="space-y-3 mb-6">
-                  {q.options.map((opt, i) => {
-                    const isStudentChoice = opt === selectedAns;
-                    const isActualAnswer = opt === q.correctAnswer;
+                  {q.options.map((option, i) => {
+                    const optionLetter = getOptionLetter(i);
+                    const isStudentChoice = optionLetter === selectedAns;
+                    const isActualAnswer = optionLetter === q.correctAnswer;
                     
                     let rowClass = "border border-white/5 bg-white/[0.02]";
                     let icon = null;
@@ -172,15 +187,27 @@ const SolutionReviewPage = () => {
                     return (
                       <div key={i} className={cn("p-3 rounded-lg flex items-center gap-3 transition-colors", rowClass)}>
                         <span className="w-6 h-6 rounded flex items-center justify-center bg-black/40 text-white/40 text-xs font-orbitron flex-shrink-0">
-                          {String.fromCharCode(65 + i)}
+                          {optionLetter}
                         </span>
-                        <span className={cn(
-                          "flex-1 font-inter text-sm",
-                          isActualAnswer ? "text-neon-green font-medium" : 
-                          isStudentChoice ? "text-neon-red line-through opacity-70" : "text-white/60"
-                        )}>
-                          {opt}
-                        </span>
+                        <div className="flex-1 space-y-2">
+                          {option.text && (
+                            <span className={cn(
+                              "block font-inter text-sm",
+                              isActualAnswer ? "text-neon-green font-medium" :
+                              isStudentChoice ? "text-neon-red line-through opacity-70" : "text-white/60"
+                            )}>
+                              {option.text}
+                            </span>
+                          )}
+                          {option.image && (
+                            <img
+                              src={getAssetUrl(option.image)}
+                              alt={`Option ${optionLetter}`}
+                              className="max-w-xs max-h-32 rounded-lg object-contain border border-white/10"
+                              loading="lazy"
+                            />
+                          )}
+                        </div>
                         {icon && <div className="flex-shrink-0">{icon}</div>}
                       </div>
                     );

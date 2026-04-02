@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
-import { getMyResultsApi, startTestApi, startScheduledTestApi } from '@/api/testApi';
+import { getMyResultsApi, startScheduledTestApi } from '@/api/testApi';
 import { getMyScheduledTestsApi } from '@/api/scheduledApi';
 import type { TestAttempt } from '@/types';
 import { cn } from '@/lib/utils';
@@ -20,7 +20,7 @@ import {
 } from 'recharts';
 import {
   BookOpen, Trophy, Clock, TrendingUp, Plus, ArrowRight,
-  Zap, Target, ChevronRight, Star, Activity, Brain, Flame, Lock, Calendar
+  Zap, Target, ChevronRight, Star, Activity, Brain, Flame, Lock, Calendar, AlertCircle
 } from 'lucide-react';
 
 // ── Custom chart tooltip ──────────────────────────────────────────
@@ -116,6 +116,7 @@ const DashboardPage = () => {
   // Scheduled tests and starting logic
   const [scheduledTests, setScheduledTests] = useState<any[]>([]);
   const [startingTestId, setStartingTestId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetch = async () => {
@@ -143,6 +144,7 @@ const DashboardPage = () => {
   const handleStartScheduled = async (test: any) => {
     if (test.status === 'locked' || startingTestId) return;
     
+    setError(null);
     setStartingTestId(test._id);
     try {
       const res = await startScheduledTestApi(test._id);
@@ -154,12 +156,18 @@ const DashboardPage = () => {
             questions: res.data.questions,
             title: res.data.title,
             totalQuestions: res.data.totalQuestions,
-            totalTime: test.timeLimit * 60,
+            totalTime: res.data.durationSeconds ?? test.timeLimit * 60,
             isProctored: true, // Force proctoring for admin scheduled tests
           },
         });
+      } else {
+        // Handle API errors (including "already attempted")
+        const errorMessage = res.message || 'Failed to start test. Please try again.';
+        setError(errorMessage);
       }
     } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to start test. Please try again.';
+      setError(errorMessage);
       console.error("Failed to start scheduled test", err);
     } finally {
       setStartingTestId(null);
@@ -354,6 +362,22 @@ const DashboardPage = () => {
              <Calendar size={18} className="text-neon-violet" />
              <h2 className="font-inter font-semibold text-white">Upcoming & Assigned Tests</h2>
            </div>
+
+           {/* Error alert for test start failures */}
+           {error && (
+             <div className="mb-5 flex items-start gap-3 p-3.5 rounded-xl bg-neon-red/8 border border-neon-red/25 animate-fade-in">
+               <AlertCircle size={16} className="text-neon-red flex-shrink-0 mt-0.5" />
+               <div className="flex-1">
+                 <p className="text-neon-red text-sm font-inter leading-snug">{error}</p>
+               </div>
+               <button
+                 onClick={() => setError(null)}
+                 className="text-neon-red/60 hover:text-neon-red transition-colors flex-shrink-0 ml-2"
+               >
+                 ✕
+               </button>
+             </div>
+           )}
            
            <div className="grid md:grid-cols-2 gap-4">
              {scheduledTests.map(test => {

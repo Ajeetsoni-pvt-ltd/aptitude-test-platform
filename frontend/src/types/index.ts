@@ -1,7 +1,3 @@
-// frontend/src/types/index.ts
-// Global TypeScript Types — Poore frontend mein use honge
-
-// ─── User Type ─────────────────────────────────────────────────
 export interface User {
   _id: string;
   name: string;
@@ -10,7 +6,6 @@ export interface User {
   createdAt?: string;
 }
 
-// ─── Auth Response (Backend se aata hai) ──────────────────────
 export interface AuthResponse {
   success: boolean;
   message: string;
@@ -20,27 +15,29 @@ export interface AuthResponse {
   };
 }
 
-// ─── Generic API Response ──────────────────────────────────────
 export interface ApiResponse<T> {
   success: boolean;
   message: string;
   data: T | null;
 }
 
-// ─── Question Type ─────────────────────────────────────────────
+export interface QuestionOption {
+  text?: string;
+  image?: string;
+}
+
 export interface Question {
   _id: string;
   topic: string;
-  subtopic: string;
-  concept: string;
-  questionText: string;
-  options: string[];
-  correctAnswer?: string; // Test ke waqt nahi aata
+  subtopic?: string;
+  questionText?: string;
+  questionImage?: string;
+  options: QuestionOption[];
+  correctAnswer?: 'A' | 'B' | 'C' | 'D';
   explanation?: string;
   difficulty: 'easy' | 'medium' | 'hard';
 }
 
-// ─── Test Attempt Type ─────────────────────────────────────────
 export interface TestAttempt {
   _id: string;
   title: string;
@@ -54,7 +51,6 @@ export interface TestAttempt {
   createdAt: string;
 }
 
-// ─── Form Types ────────────────────────────────────────────────
 export interface LoginFormData {
   email: string;
   password: string;
