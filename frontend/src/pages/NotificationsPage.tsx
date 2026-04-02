@@ -5,7 +5,7 @@ import HoloButton from '@/components/ui/HoloButton';
 import { getMyNotificationsApi, markNotificationAsReadApi, markAllNotificationsAsReadApi } from '@/api/notificationApi';
 import { startScheduledTestApi } from '@/api/testApi';
 import { useNavigate } from 'react-router-dom';
-import { Bell, CheckSquare, Zap, Target, Lock } from 'lucide-react';
+import { Bell, CheckSquare, Zap, Target, Lock, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
@@ -14,6 +14,7 @@ const NotificationsPage = () => {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [startingTestId, setStartingTestId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchNotifications = async () => {
     setIsLoading(true);
@@ -52,10 +53,14 @@ const NotificationsPage = () => {
     // Determine runtime status
     const now = Date.now();
     const start = new Date(test.startTime).getTime();
-    const status = now < start ? 'locked' : now < start + test.timeLimit * 60000 ? 'live' : 'completed';
+    const end = test.endTime
+      ? new Date(test.endTime).getTime()
+      : start + test.timeLimit * 60000;
+    const status = now < start ? 'locked' : now < end ? 'live' : 'completed';
 
     if (status === 'locked' || startingTestId) return;
     
+    setError(null);
     setStartingTestId(test._id);
     try {
       const res = await startScheduledTestApi(test._id);
@@ -69,12 +74,18 @@ const NotificationsPage = () => {
             questions: res.data.questions,
             title: res.data.title,
             totalQuestions: res.data.totalQuestions,
-            totalTime: test.timeLimit * 60,
+            totalTime: res.data.durationSeconds ?? test.timeLimit * 60,
             isProctored: true,
           },
         });
+      } else {
+        // Handle API errors (including "already attempted")
+        const errorMessage = res.message || 'Failed to start test. Please try again.';
+        setError(errorMessage);
       }
     } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to start test. Please try again.';
+      setError(errorMessage);
       console.error("Failed to start scheduled test", err);
     } finally {
       setStartingTestId(null);
@@ -122,6 +133,22 @@ const NotificationsPage = () => {
           </div>
         ) : (
           <div className="space-y-3 lg:space-y-4">
+            {/* Error alert for test start failures */}
+            {error && (
+              <div className="flex items-start gap-3 p-3.5 rounded-xl bg-neon-red/8 border border-neon-red/25 animate-fade-in">
+                <AlertCircle size={16} className="text-neon-red flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-neon-red text-sm font-inter leading-snug">{error}</p>
+                </div>
+                <button
+                  onClick={() => setError(null)}
+                  className="text-neon-red/60 hover:text-neon-red transition-colors flex-shrink-0 ml-2"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
             {notifications.map(n => (
                <div 
                  key={n._id}
@@ -157,7 +184,9 @@ const NotificationsPage = () => {
                          const test = n.relatedEntity;
                          const now = Date.now();
                          const start = new Date(test.startTime).getTime();
-                         const end = start + test.timeLimit * 60000;
+                         const end = test.endTime
+                           ? new Date(test.endTime).getTime()
+                           : start + test.timeLimit * 60000;
                          const isLocked = now < start;
                          const isLive = now >= start && now < end;
                          

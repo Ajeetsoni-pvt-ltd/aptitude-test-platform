@@ -11,6 +11,7 @@ import useTimer         from '@/hooks/useTimer';
 import { submitTestApi } from '@/api/testApi';
 import type { Question } from '@/types';
 import { cn } from '@/lib/utils';
+import { getAssetUrl, getOptionLetter } from '@/lib/question';
 import HoloButton        from '@/components/ui/HoloButton';
 import ProgressRing      from '@/components/ui/ProgressRing';
 import FaceTrackerOverlay from '@/components/ui/FaceTrackerOverlay';
@@ -281,8 +282,6 @@ const TestContent = ({
   const answeredCount = Object.keys(answers).length;
   const progress      = Math.round((answeredCount / questions.length) * 100);
   const isTimeCrit    = timeLeft <= 60;
-  const letters       = ['A', 'B', 'C', 'D', 'E'];
-
   if (!started) {
     return (
       <div className="relative">
@@ -451,36 +450,77 @@ const TestContent = ({
 
             {/* Question text */}
             <div className="glass-card rounded-2xl p-6 border border-white/6 mb-6 animate-fade-up" style={{ animationDelay: '0.1s' }}>
-              <p className="text-white/90 text-base sm:text-lg font-inter leading-relaxed">
-                {q.questionText}
-              </p>
+              {q.questionImage ? (
+                <div className="flex flex-col items-center gap-4">
+                  {q.questionText && (
+                    <p className="text-white/90 text-sm sm:text-base font-inter text-center leading-relaxed">
+                      {q.questionText}
+                    </p>
+                  )}
+                  <img
+                    src={getAssetUrl(q.questionImage)}
+                    alt="Question"
+                    className="max-w-full max-h-96 rounded-lg object-contain shadow-[0_0_30px_rgba(0,245,255,0.2)]"
+                    loading="lazy"
+                  />
+                </div>
+              ) : (
+                <p className="text-white/90 text-base sm:text-lg font-inter leading-relaxed">
+                  {q.questionText}
+                </p>
+              )}
             </div>
 
             {/* Options */}
             <div className="space-y-3">
-              {q.options.map((opt, i) => {
-                const selected = answers[q._id] === opt;
+              {q.options.map((option, i) => {
+                const optionLetter = getOptionLetter(i);
+                const selected = answers[q._id] === optionLetter;
+
                 return (
                   <button
                     key={i}
-                    onClick={() => setAnswers((prev) => ({ ...prev, [q._id]: opt }))}
+                    onClick={() => setAnswers((prev) => ({ ...prev, [q._id]: optionLetter }))}
                     className={cn(
-                      'answer-option w-full flex items-center gap-4 text-left animate-fade-up',
-                      selected && 'selected'
+                      'answer-option w-full flex flex-col items-start gap-4 text-left animate-fade-up',
+                      selected && 'selected',
+                      option.image && 'justify-start'
                     )}
                     style={{ animationDelay: `${0.1 + i * 0.05}s` }}
                   >
-                    <span className={cn(
-                      'w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold font-orbitron flex-shrink-0 transition-all duration-200',
-                      selected
-                        ? 'bg-neon-cyan text-cyber-black shadow-[0_0_10px_rgba(0,245,255,0.6)]'
-                        : 'bg-white/5 text-white/30 border border-white/8'
-                    )}>
-                      {letters[i]}
-                    </span>
-                    <span className={cn('font-inter text-sm transition-colors', selected ? 'text-neon-cyan' : 'text-white/70')}>
-                      {opt}
-                    </span>
+                    <div className="flex items-start sm:items-center gap-4 w-full">
+                      <span className={cn(
+                        'w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold font-orbitron flex-shrink-0 transition-all duration-200 mt-1 sm:mt-0',
+                        selected
+                          ? 'bg-neon-cyan text-cyber-black shadow-[0_0_10px_rgba(0,245,255,0.6)]'
+                          : 'bg-white/5 text-white/30 border border-white/8'
+                      )}>
+                        {optionLetter}
+                      </span>
+
+                      {option.image ? (
+                        <div className="flex-1">
+                          <img
+                            src={getAssetUrl(option.image)}
+                            alt={`Option ${optionLetter}`}
+                            className="max-w-xs max-h-40 rounded-lg object-contain"
+                            loading="lazy"
+                          />
+                          {option.text && (
+                            <p className={cn(
+                              'text-xs mt-2 font-inter transition-colors',
+                              selected ? 'text-neon-cyan' : 'text-white/50'
+                            )}>
+                              {option.text}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <span className={cn('font-inter text-sm transition-colors flex-1', selected ? 'text-neon-cyan' : 'text-white/70')}>
+                          {option.text}
+                        </span>
+                      )}
+                    </div>
                   </button>
                 );
               })}

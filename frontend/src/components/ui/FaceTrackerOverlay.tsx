@@ -2,7 +2,6 @@
 // Floating camera preview + full-screen red holographic warning
 // when face is not detected in proctored mode.
 
-import { useEffect, useRef } from 'react';
 import { Camera, AlertTriangle, Eye, EyeOff, WifiOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -104,8 +103,12 @@ const FaceTrackerOverlay = ({
             autoPlay
             playsInline
             muted
-            className="w-full h-full object-cover scale-x-[-1]" // mirror effect
-            style={{ filter: isActive && !isFaceDetected ? 'hue-rotate(300deg) saturate(2)' : 'none' }}
+            className="w-full h-full object-cover"
+            style={{
+              transform: 'scaleX(-1)',
+              filter: isActive && !isFaceDetected ? 'hue-rotate(300deg) saturate(2)' : 'none',
+              backgroundColor: '#000000',
+            }}
           />
 
           {/* Overlay when loading */}

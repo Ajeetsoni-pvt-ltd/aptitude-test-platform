@@ -1,649 +1,577 @@
-// src/pages/admin/CreateTestPage.tsx
-// Admin: Create & schedule a full-length test with student assignment and time lock
-
-import { useState, useMemo, useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import AdminLayout from '@/components/AdminLayout';
 import NeonCard from '@/components/ui/NeonCard';
 import HoloButton from '@/components/ui/HoloButton';
+import { downloadBulkTemplateApi, getAllUsersApi, type BulkUploadResult } from '@/api/adminApi';
+import { createFullLengthTestApi, getAllScheduledTestsApi } from '@/api/scheduledApi';
 import { cn } from '@/lib/utils';
-import {
-  Upload, Users, Calendar, Lock, CheckCircle2,
-  Search, X, Clock, AlertTriangle, Zap, Send,
-  FileText, Shield,
-} from 'lucide-react';
-
-import { getAllUsersApi, uploadQuestionsApi } from '@/api/adminApi';
-import { createScheduledTestApi, getAllScheduledTestsApi } from '@/api/scheduledApi';
 import type { User } from '@/types';
-
-// Utility to generate avatars from names
-const getInitials = (name: string) => {
-  const parts = name.trim().split(' ');
-  if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-  return name.substring(0, 2).toUpperCase();
-};
+import {
+  AlertTriangle,
+  Bell,
+  Calendar,
+  CheckCircle2,
+  Clock,
+  Download,
+  FileSpreadsheet,
+  Image as ImageIcon,
+  Lock,
+  Search,
+  Send,
+  Shield,
+  Users,
+  X,
+} from 'lucide-react';
 
 interface StudentOption {
   id: string;
   name: string;
   email: string;
   avatar: string;
-  batch: string;
 }
 
-
+interface ScheduledTestCard {
+  id: string;
+  title: string;
+  students: number;
+  questionCount: number;
+  startTime: Date;
+  endTime: Date;
+  status: TestStatus;
+}
 
 type TestStatus = 'locked' | 'live' | 'completed';
 
-const getStatus = (startTime: Date | string): TestStatus => {
+const getInitials = (name: string) => {
+  const parts = name.trim().split(' ');
+  if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  return name.substring(0, 2).toUpperCase();
+};
+
+const getStatus = (startTime: Date | string, endTime: Date | string): TestStatus => {
   const now = Date.now();
   const start = new Date(startTime).getTime();
-  if (now < start)             return 'locked';
-  if (now < start + 7200_000)  return 'live';
+  const end = new Date(endTime).getTime();
+  if (now < start) return 'locked';
+  if (now < end) return 'live';
   return 'completed';
 };
 
-const StatusBadge = ({ status }: { status: TestStatus }) => {
-  const configs: Record<TestStatus, { label: string; cls: string; icon: React.ReactNode }> = {
-    locked:    { label: '🔒 Locked',    cls: 'border-neon-amber/40 bg-neon-amber/10 text-neon-amber',   icon: <Lock size={11} /> },
-    live:      { label: '🟢 Live',      cls: 'border-neon-green/40 bg-neon-green/10 text-neon-green animate-neon-pulse', icon: <div className="w-2 h-2 rounded-full bg-neon-green animate-neon-pulse" /> },
-    completed: { label: '✅ Completed', cls: 'border-white/15 bg-white/5 text-white/40',                icon: <CheckCircle2 size={11} /> },
-  };
-  const c = configs[status];
-  return (
-    <span className={cn('inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-inter font-medium', c.cls)}>
-      {c.label}
-    </span>
-  );
-};
-
-// ── Main Component ────────────────────────────────────────────────
 const CreateTestPage = () => {
+  const [title, setTitle] = useState('');
+  const [timeLimit, setTimeLimit] = useState(180);
+  const [startDate, setStartDate] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const [workbook, setWorkbook] = useState<File | null>(null);
+  const [imagesZip, setImagesZip] = useState<File | null>(null);
+  const [students, setStudents] = useState<StudentOption[]>([]);
+  const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
+  const [search, setSearch] = useState('');
+  const [scheduledTests, setScheduledTests] = useState<ScheduledTestCard[]>([]);
+  const [uploadResult, setUploadResult] = useState<BulkUploadResult | null>(null);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [studentLoadError, setStudentLoadError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const workbookRef = useRef<HTMLInputElement>(null);
+  const zipRef = useRef<HTMLInputElement>(null);
 
-  // Form state
-  const [testTitle,      setTestTitle]      = useState('');
-  const [testTopic,      setTestTopic]      = useState('Quantitative Aptitude');
-  const [testDifficulty, setTestDifficulty] = useState('all');
-  const [questionCount,  setQuestionCount]  = useState(30);
-  const [timeLimit,      setTimeLimit]      = useState(60); // minutes
-  const [startDate,      setStartDate]      = useState('');
-  const [startTime,      setStartTime]      = useState('');
-  const [selectedStu,    setSelectedStu]    = useState<string[]>([]);
-  const [stuSearch,      setStuSearch]      = useState('');
-  const [uploadFile,     setUploadFile]     = useState<File | null>(null);
-  const [uploadedQuestionIds, setUploadedQuestionIds] = useState<string[]>([]);
-  const [isSubmitting,   setIsSubmitting]   = useState(false);
-  const [success,        setSuccess]        = useState(false);
-  const [error,          setError]          = useState('');
-
-  // Students state
-  const [allStudents,    setAllStudents]    = useState<StudentOption[]>([]);
-  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
-
-  // Fetch actual users on load
   useEffect(() => {
-    const fetchUsers = async () => {
-      setIsLoadingUsers(true);
-      try {
-        // Fetch up to 1000 users for the test scheduling assign feature
-        const res = await getAllUsersApi(1, 1000);
-        if (res.success && res.data) {
-           const studentsOnly = res.data.users
-            .filter((u: User) => u.role === 'student')
-            .map((u: User) => ({
-              id: u._id,
-              name: u.name,
-              email: u.email,
-              avatar: getInitials(u.name || 'User'),
-              batch: 'Standard Batch' // Or map to actual batch if available in DB
-            }));
-           setAllStudents(studentsOnly);
+    const load = async () => {
+      setLoadingUsers(true);
+      setStudentLoadError('');
+
+      const [usersResult, testsResult] = await Promise.allSettled([
+        getAllUsersApi(1, 1000),
+        getAllScheduledTestsApi(),
+      ]);
+
+      if (usersResult.status === 'fulfilled') {
+        const usersRes = usersResult.value;
+        if (usersRes.success && usersRes.data) {
+          const availableUsers = Array.isArray(usersRes.data.users) ? usersRes.data.users : [];
+          setStudents(
+            (availableUsers as User[])
+              .filter((user) => String(user.role ?? '').trim().toLowerCase() === 'student')
+              .map((user) => {
+                const displayName = user.name?.trim() || user.email || 'Student';
+                return {
+                  id: user._id,
+                  name: displayName,
+                  email: user.email || 'No email available',
+                  avatar: getInitials(displayName),
+                };
+              })
+              .sort((a, b) => a.name.localeCompare(b.name))
+          );
+        } else {
+          setStudents([]);
+          setStudentLoadError(usersRes.message || 'Failed to load students.');
         }
-      } catch (err) {
-        console.error("Failed to load users", err);
-      } finally {
-        setIsLoadingUsers(false);
+      } else {
+        console.error('Failed to load students for create-test', usersResult.reason);
+        setStudents([]);
+        setStudentLoadError('Failed to load students. Please refresh and try again.');
       }
-    };
-    
-    // Fetch all admin scheduled tests
-    const fetchScheduled = async () => {
-      try {
-        const res = await getAllScheduledTestsApi();
-        if (res.success) {
-          setScheduledTests(res.data.map((t: any) => ({
-            id: t._id,
-            title: t.title,
-            students: t.assignedStudents.length,
-            startTime: new Date(t.startTime),
-            status: t.status,
-          })));
+
+      if (testsResult.status === 'fulfilled') {
+        const testsRes = testsResult.value;
+        if (testsRes.success && testsRes.data) {
+          const scheduledTestItems = Array.isArray(testsRes.data) ? testsRes.data : [];
+          setScheduledTests(
+            scheduledTestItems.map((test: any) => ({
+              id: test._id,
+              title: test.title,
+              students: Array.isArray(test.assignedStudents) ? test.assignedStudents.length : 0,
+              questionCount: test.questionCount,
+              startTime: new Date(test.startTime),
+              endTime: new Date(test.endTime),
+              status: test.status,
+            }))
+          );
+        } else {
+          setScheduledTests([]);
         }
-      } catch (err) {
-        console.error("Failed to load scheduled tests");
+      } else {
+        console.error('Failed to load scheduled tests for create-test', testsResult.reason);
+        setScheduledTests([]);
       }
+
+      setLoadingUsers(false);
     };
 
-    fetchUsers();
-    fetchScheduled();
+    load();
   }, []);
 
-  // Use local state for scheduled table rendering
-  const [scheduledTests, setScheduledTests] = useState<any[]>([]);
-
-  const filteredStudents = useMemo(() =>
-    allStudents.filter(s =>
-      s.name.toLowerCase().includes(stuSearch.toLowerCase()) ||
-      s.email.toLowerCase().includes(stuSearch.toLowerCase()) ||
-      s.batch.toLowerCase().includes(stuSearch.toLowerCase())
-    ), [stuSearch, allStudents]
+  const filteredStudents = useMemo(
+    () =>
+      students.filter((student) =>
+        [student.name, student.email].some((value) => value.toLowerCase().includes(search.toLowerCase()))
+      ),
+    [students, search]
   );
 
-  const toggleStudent = (id: string) => {
-    setSelectedStu(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
+  const invalidRows = useMemo(
+    () => uploadResult?.rows.filter((row) => row.status === 'invalid') || [],
+    [uploadResult]
+  );
+
+  const windowRange = useMemo(() => {
+    if (!startDate || !startTime || !endDate || !endTime) return null;
+    const start = new Date(`${startDate}T${startTime}`);
+    const end = new Date(`${endDate}T${endTime}`);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+    return { start, end };
+  }, [startDate, startTime, endDate, endTime]);
+
+  const setWorkbookFile = (file: File | null) => {
+    if (!file) {
+      setWorkbook(null);
+      setUploadResult(null);
+      return;
+    }
+    if (!/\.(xlsx|csv)$/i.test(file.name)) {
+      setError('Upload a valid workbook in .xlsx or .csv format.');
+      return;
+    }
+    setWorkbook(file);
+    setUploadResult(null);
+    setError('');
+    setSuccess('');
   };
 
-  const selectAll = () => setSelectedStu(filteredStudents.map(s => s.id));
-  const clearAll  = () => setSelectedStu([]);
-
-  const handleCreate = async () => {
-    if (!testTitle.trim()) { setError('Test title is required.'); return; }
-    if (!startDate || !startTime) { setError('Please set a start date and time.'); return; }
-    if (selectedStu.length === 0) { setError('Please select at least one student.'); return; }
-
+  const setZipFile = (file: File | null) => {
+    if (!file) {
+      setImagesZip(null);
+      return;
+    }
+    if (!/\.zip$/i.test(file.name)) {
+      setError('Image bundle must be a .zip file.');
+      return;
+    }
+    setImagesZip(file);
     setError('');
-    setIsSubmitting(true);
+  };
 
+  const downloadTemplate = async () => {
     try {
-      let questionIds: string[] = [];
-
-      // Step 1: Upload file if selected and extract question IDs
-      if (uploadFile) {
-        try {
-          const uploadRes = await uploadQuestionsApi(uploadFile);
-          if (uploadRes.success && uploadRes.data?.questionIds) {
-            questionIds = uploadRes.data.questionIds;
-            setUploadedQuestionIds(questionIds);
-          } else {
-            setError('Questions uploaded but could not extract IDs. Please try again.');
-            setIsSubmitting(false);
-            return;
-          }
-        } catch (uploadErr: any) {
-          const msg = uploadErr?.response?.data?.message || 'Failed to upload file';
-          setError(msg);
-          setIsSubmitting(false);
-          return;
-        }
-      }
-
-      // Step 2: Create scheduled test with or without uploaded questions
-      const scheduled = new Date(`${startDate}T${startTime}`);
-      
-      const payload: any = {
-        title: testTitle,
-        topic: testTopic,
-        difficulty: testDifficulty,
-        questionCount: questionIds.length > 0 ? questionIds.length : questionCount,
-        timeLimit,
-        startTime: scheduled.toISOString(),
-        assignedStudents: selectedStu,
-      };
-
-      // Include custom questions if they were uploaded
-      if (questionIds.length > 0) {
-        payload.customQuestions = questionIds;
-      }
-
-      const res = await createScheduledTestApi(payload);
-
-      if (res.success) {
-        setScheduledTests(prev => [{
-          id: res.data._id || `st-${Date.now()}`,
-          title: testTitle,
-          students: selectedStu.length,
-          startTime: scheduled,
-          status: getStatus(scheduled),
-        }, ...prev]);
-
-        setSuccess(true);
-        setTestTitle('');
-        setSelectedStu([]);
-        setStartDate('');
-        setStartTime('');
-        setUploadFile(null);
-        setUploadedQuestionIds([]);
-        setTimeout(() => setSuccess(false), 4000);
-      } else {
-        setError(res.message || 'Failed to schedule test');
-      }
-    } catch (err: any) {
-      setError(err?.response?.data?.message || err.message || 'Error occurred');
-    } finally {
-      setIsSubmitting(false);
+      const blob = await downloadBulkTemplateApi();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'question-bulk-upload-template.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch {
+      setError('Template download failed.');
     }
   };
 
-  const now = new Date();
+  const handleCreate = async () => {
+    if (!title.trim()) return setError('Test title is required.');
+    if (!windowRange) return setError('Please set valid start and end date/time values.');
+    if (windowRange.end <= windowRange.start) return setError('End time must be after the start time.');
+    if (timeLimit * 60_000 > windowRange.end.getTime() - windowRange.start.getTime()) {
+      return setError('Duration cannot be longer than the scheduled access window.');
+    }
+    if (!workbook) return setError('Upload a workbook before creating the test.');
+    if (selectedStudents.length === 0) return setError('Please select at least one student.');
+
+    setSubmitting(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const formData = new FormData();
+      formData.append('title', title.trim());
+      formData.append('timeLimit', String(timeLimit));
+      formData.append('startTime', windowRange.start.toISOString());
+      formData.append('endTime', windowRange.end.toISOString());
+      formData.append('assignedStudents', JSON.stringify(selectedStudents));
+      formData.append('oneAttemptOnly', 'true');
+      formData.append('file', workbook);
+      if (imagesZip) formData.append('imagesZip', imagesZip);
+
+      const response = await createFullLengthTestApi(formData);
+      if (!response.success || !response.data) {
+        setError(response.message || 'Failed to create test.');
+        return;
+      }
+
+      const createdUploadResult = response.data.uploadResult as BulkUploadResult;
+      const test = response.data.test;
+      setUploadResult(createdUploadResult);
+      setScheduledTests((prev) => [
+        {
+          id: test._id,
+          title: test.title,
+          students: test.assignedStudents.length,
+          questionCount: test.questionCount,
+          startTime: new Date(test.startTime),
+          endTime: new Date(test.endTime),
+          status: getStatus(test.startTime, test.endTime),
+        },
+        ...prev,
+      ]);
+      setSuccess(
+        `${createdUploadResult.summary.savedRows} questions uploaded and assigned to ${selectedStudents.length} student${selectedStudents.length === 1 ? '' : 's'}.`
+      );
+      setTitle('');
+      setTimeLimit(180);
+      setStartDate('');
+      setStartTime('');
+      setEndDate('');
+      setEndTime('');
+      setWorkbook(null);
+      setImagesZip(null);
+      setSelectedStudents([]);
+    } catch (submitError: any) {
+      const responseData = submitError?.response?.data;
+      const failedUploadResult = responseData?.data?.uploadResult as BulkUploadResult | undefined;
+      if (failedUploadResult) setUploadResult(failedUploadResult);
+      setError(responseData?.message || submitError.message || 'Error occurred while creating the test.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <AdminLayout>
-      <div className="min-h-screen" style={{ background: '#080810' }}>
-        <div className="max-w-6xl mx-auto p-6">
+      <div className="max-w-6xl mx-auto p-6 space-y-6">
+        <div>
+          <h1 className="font-orbitron text-2xl font-bold text-white tracking-wide">
+            Create <span className="gradient-text-cyan-violet">Test</span>
+          </h1>
+          <p className="text-white/30 text-sm font-inter mt-1.5">
+            Upload questions, assign students, and schedule the test in one flow.
+          </p>
+        </div>
 
-          {/* Header */}
-          <div className="mb-8 animate-fade-up">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-neon-cyan/20 to-neon-violet/20 border border-neon-cyan/30 flex items-center justify-center">
-                <Zap size={20} className="text-neon-cyan" />
-              </div>
-              <div>
-                <h1 className="font-orbitron text-2xl font-bold text-white tracking-wide">
-                  Create <span className="gradient-text-cyan-violet">Full-Length Test</span>
-                </h1>
-                <p className="text-white/30 text-sm font-inter mt-0.5">Schedule and assign tests to specific students</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid lg:grid-cols-3 gap-6">
-
-            {/* ── Left col (2/3): Form ─────────────────────────── */}
-            <div className="lg:col-span-2 space-y-5">
-
-              {/* Step 1: Test Details */}
-              <NeonCard variant="cyan" padding="p-6">
-                <h2 className="font-inter font-semibold text-white mb-4 flex items-center gap-2">
-                  <FileText size={17} className="text-neon-cyan" />
-                  Step 1 — Test Details
-                </h2>
-
-                {/* Title */}
-                <div className="mb-4">
-                  <label className="text-white/40 text-xs uppercase tracking-widest font-inter block mb-2">Test Title *</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Quantitative Aptitude — Final Mock 2026"
-                    value={testTitle}
-                    onChange={e => { setTestTitle(e.target.value); setError(''); }}
-                    className="cyber-input w-full px-4 py-3 text-sm"
-                  />
-                </div>
-
-                {/* Topic + Difficulty row */}
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <label className="text-white/40 text-xs uppercase tracking-widest font-inter block mb-2">Topic</label>
-                    <select
-                      value={testTopic}
-                      onChange={e => setTestTopic(e.target.value)}
-                      className="cyber-input w-full px-4 py-3 text-sm appearance-none"
+        <div className="grid lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-5">
+            <NeonCard variant="cyan" padding="p-6">
+              <h2 className="font-inter font-semibold text-white mb-4 flex items-center gap-2">
+                <FileSpreadsheet size={17} className="text-neon-cyan" />
+                Step 1 - Test Setup
+              </h2>
+              <div className="space-y-4">
+                <input
+                  value={title}
+                  onChange={(event) => {
+                    setTitle(event.target.value);
+                    setError('');
+                  }}
+                  placeholder="Test title"
+                  className="cyber-input w-full px-4 py-3 text-sm"
+                />
+                <input
+                  type="number"
+                  min={1}
+                  value={timeLimit}
+                  onChange={(event) => setTimeLimit(Number(event.target.value))}
+                  className="cyber-input w-full px-4 py-3 text-sm"
+                  placeholder="Duration in minutes"
+                />
+                <div className="rounded-xl border border-neon-cyan/20 bg-neon-cyan/5 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <div>
+                      <p className="text-neon-cyan text-sm font-semibold">Upload Excel File (.xlsx / .csv)</p>
+                      <p className="text-white/35 text-xs mt-1">
+                        Optional image bundle support is available for image-based questions.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={downloadTemplate}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-neon-cyan/20 bg-neon-cyan/10 text-neon-cyan text-xs font-inter"
                     >
-                      {['Quantitative Aptitude', 'Verbal Ability', 'Logical Reasoning'].map(t => (
-                        <option key={t} value={t} className="bg-cyber-black">{t}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-white/40 text-xs uppercase tracking-widest font-inter block mb-2">Difficulty</label>
-                    <select
-                      value={testDifficulty}
-                      onChange={e => setTestDifficulty(e.target.value)}
-                      className="cyber-input w-full px-4 py-3 text-sm appearance-none"
-                    >
-                      {[['all', 'Mixed'], ['easy', 'Easy'], ['medium', 'Medium'], ['hard', 'Hard']].map(([v, l]) => (
-                        <option key={v} value={v} className="bg-cyber-black">{l}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Questions + Time row */}
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <label className="text-white/40 text-xs uppercase tracking-widest font-inter block mb-2 flex items-center gap-2">
-                      {uploadedQuestionIds.length > 0 ? (
-                        <>
-                          Questions <span className="text-neon-green">(Uploaded: {uploadedQuestionIds.length})</span>
-                        </>
-                      ) : (
-                        <>Questions ({questionCount})</>
-                      )}
-                    </label>
-                    {uploadedQuestionIds.length > 0 ? (
-                      <div className="w-full p-3 rounded-lg bg-neon-green/10 border border-neon-green/30">
-                        <p className="text-neon-green text-sm font-inter font-semibold">{uploadedQuestionIds.length} Questions</p>
-                        <p className="text-neon-green/60 text-xs font-inter mt-1">All uploaded questions will be used</p>
-                      </div>
-                    ) : (
-                      <>
-                        <input
-                          type="range" min={5} max={100} value={questionCount}
-                          onChange={e => setQuestionCount(Number(e.target.value))}
-                          className="w-full accent-cyan-400 cursor-pointer"
-                        />
-                        <div className="flex justify-between text-[10px] text-white/20 font-mono-code mt-1">
-                          <span>5</span><span className="text-neon-cyan font-bold">{questionCount}</span><span>100</span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                  <div>
-                    <label className="text-white/40 text-xs uppercase tracking-widest font-inter block mb-2">
-                      Time Limit ({timeLimit} min)
-                    </label>
-                    <input
-                      type="range" min={10} max={180} step={5} value={timeLimit}
-                      onChange={e => setTimeLimit(Number(e.target.value))}
-                      className="w-full accent-amber-400 cursor-pointer"
-                    />
-                    <div className="flex justify-between text-[10px] text-white/20 font-mono-code mt-1">
-                      <span>10m</span><span className="text-neon-amber font-bold">{timeLimit}m</span><span>180m</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* File upload (optional) */}
-                <div>
-                  <label className="text-white/40 text-xs uppercase tracking-widest font-inter block mb-2 flex items-center gap-2">
-                    <Upload size={11} /> Upload Custom Questions (optional)
-                  </label>
-                  <div
-                    onClick={() => document.getElementById('admin-file-input')?.click()}
-                    className={cn(
-                      'border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all duration-300',
-                      uploadFile
-                        ? 'border-neon-green/40 bg-neon-green/5'
-                        : 'border-white/10 hover:border-neon-cyan/30 hover:bg-neon-cyan/[0.03]'
-                    )}
-                  >
-                    {uploadFile ? (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-center gap-3">
-                          <CheckCircle2 size={20} className="text-neon-green" />
-                          <span className="text-neon-green text-sm font-inter">{uploadFile.name}</span>
-                          <button onClick={(e) => { e.stopPropagation(); setUploadFile(null); setUploadedQuestionIds([]); }} className="text-white/30 hover:text-neon-red">
-                            <X size={16} />
-                          </button>
-                        </div>
-                        <p className="text-neon-green/70 text-xs font-inter">Selected: {uploadFile.name} · Ready to upload on test creation</p>
-                      </div>
-                    ) : (
-                      <>
-                        <Upload size={24} className="text-white/20 mx-auto mb-2" />
-                        <p className="text-white/30 text-sm font-inter">JSON / CSV / DOCX format</p>
-                        <p className="text-white/15 text-xs font-inter mt-1">Or leave blank to pull from question bank</p>
-                      </>
-                    )}
-                    <input
-                      id="admin-file-input"
-                      type="file"
-                      accept=".json,.csv,.docx"
-                      className="hidden"
-                      onChange={e => setUploadFile(e.target.files?.[0] ?? null)}
-                    />
-                  </div>
-                  {uploadedQuestionIds.length > 0 && (
-                    <div className="mt-3 p-3 rounded-lg bg-neon-cyan/10 border border-neon-cyan/30">
-                      <p className="text-neon-cyan text-xs font-inter font-semibold">✅ Uploaded: {uploadedQuestionIds.length} questions ready</p>
-                    </div>
-                  )}
-                </div>
-              </NeonCard>
-
-              {/* Step 2: Schedule */}
-              <NeonCard variant="violet" padding="p-6">
-                <h2 className="font-inter font-semibold text-white mb-4 flex items-center gap-2">
-                  <Calendar size={17} className="text-neon-violet" />
-                  Step 2 — Schedule Start Time
-                </h2>
-                <p className="text-white/30 text-xs font-inter mb-4">
-                  Test will be locked for all assigned students until this exact date & time.
-                </p>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-white/40 text-xs uppercase tracking-widest font-inter block mb-2">Start Date *</label>
-                    <input
-                      type="date"
-                      min={now.toISOString().split('T')[0]}
-                      value={startDate}
-                      onChange={e => { setStartDate(e.target.value); setError(''); }}
-                      className="cyber-input w-full px-4 py-3 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-white/40 text-xs uppercase tracking-widest font-inter block mb-2">Start Time *</label>
-                    <input
-                      type="time"
-                      value={startTime}
-                      onChange={e => { setStartTime(e.target.value); setError(''); }}
-                      className="cyber-input w-full px-4 py-3 text-sm"
-                    />
-                  </div>
-                </div>
-
-                {startDate && startTime && (
-                  <div className="mt-4 holo-lock p-4 rounded-xl animate-fade-in">
-                    <div className="flex items-center gap-3">
-                      <Lock size={18} className="text-neon-amber flex-shrink-0" />
-                      <div>
-                        <p className="text-neon-amber text-sm font-inter font-semibold">
-                          Students will see:
-                        </p>
-                        <p className="text-white/50 text-xs font-mono-code mt-0.5">
-                          "Test will unlock at {new Date(`${startDate}T${startTime}`).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}"
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </NeonCard>
-
-              {/* Step 3: Student Selection */}
-              <NeonCard variant="magenta" padding="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="font-inter font-semibold text-white flex items-center gap-2">
-                    <Users size={17} className="text-neon-magenta" />
-                    Step 3 — Assign Students
-                  </h2>
-                  <div className="flex items-center gap-2">
-                    <button onClick={selectAll} className="text-xs text-neon-cyan hover:text-neon-cyan/80 font-inter transition-colors">Select All</button>
-                    <span className="text-white/20">·</span>
-                    <button onClick={clearAll} className="text-xs text-white/30 hover:text-white/50 font-inter transition-colors">Clear</button>
-                    <span className="ml-2 px-2.5 py-1 rounded-full bg-neon-magenta/20 border border-neon-magenta/30 text-neon-magenta text-xs font-orbitron font-bold">
-                      {selectedStu.length}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Search */}
-                <div className="relative mb-4">
-                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25" />
-                  <input
-                    type="text"
-                    placeholder="Search students by name, email, or batch..."
-                    value={stuSearch}
-                    onChange={e => setStuSearch(e.target.value)}
-                    className="cyber-input w-full pl-9 pr-4 py-2.5 text-sm"
-                  />
-                  {stuSearch && (
-                    <button onClick={() => setStuSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/25 hover:text-white/50">
-                      <X size={14} />
+                      <Download size={14} />
+                      Template
                     </button>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <label className="border-2 border-dashed border-white/10 rounded-2xl p-5 text-center cursor-pointer block">
+                      <input
+                        ref={workbookRef}
+                        type="file"
+                        accept=".xlsx,.csv"
+                        className="hidden"
+                        onChange={(event) => setWorkbookFile(event.target.files?.[0] ?? null)}
+                      />
+                      <div onClick={() => workbookRef.current?.click()}>
+                        <FileSpreadsheet size={24} className="text-white/25 mx-auto mb-3" />
+                        <p className="text-white/70 text-sm">{workbook ? workbook.name : 'Select workbook'}</p>
+                      </div>
+                    </label>
+                    <label className="border border-dashed border-white/10 rounded-2xl p-5 text-center cursor-pointer block">
+                      <input
+                        ref={zipRef}
+                        type="file"
+                        accept=".zip"
+                        className="hidden"
+                        onChange={(event) => setZipFile(event.target.files?.[0] ?? null)}
+                      />
+                      <div onClick={() => zipRef.current?.click()}>
+                        <ImageIcon size={22} className="text-white/25 mx-auto mb-3" />
+                        <p className="text-white/70 text-sm">{imagesZip ? imagesZip.name : 'Optional images .zip'}</p>
+                      </div>
+                    </label>
+                  </div>
+                  {uploadResult && (
+                    <div className="grid grid-cols-3 gap-3 mt-4">
+                      {[
+                        { label: 'Rows', value: uploadResult.summary.totalRows, color: 'text-neon-cyan' },
+                        { label: 'Valid', value: uploadResult.summary.validRows, color: 'text-neon-green' },
+                        { label: 'Invalid', value: uploadResult.summary.invalidRows, color: 'text-neon-red' },
+                      ].map((item) => (
+                        <div key={item.label} className="p-3 rounded-xl border border-white/10 bg-white/[0.02]">
+                          <p className={cn('font-orbitron text-2xl font-bold', item.color)}>{item.value}</p>
+                          <p className="text-white/25 text-xs">{item.label}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {invalidRows.length > 0 && (
+                    <div className="mt-4 space-y-2 rounded-xl border border-neon-red/20 bg-neon-red/8 p-4">
+                      {invalidRows.slice(0, 6).map((row) => (
+                        <p key={row.rowNumber} className="text-neon-red text-xs">
+                          Row {row.rowNumber}: {row.issues[0]}
+                        </p>
+                      ))}
+                    </div>
                   )}
                 </div>
+              </div>
+            </NeonCard>
 
-                {isLoadingUsers && (
-                  <div className="flex justify-center items-center py-8">
-                     <div className="w-5 h-5 rounded-full border-2 border-neon-magenta border-t-transparent animate-spin" />
-                  </div>
-                )}
-                
-                {!isLoadingUsers && filteredStudents.length === 0 && (
-                   <div className="py-8 text-center text-white/30 text-sm font-inter">
-                     No students found.
-                   </div>
-                )}
+            <NeonCard variant="violet" padding="p-6">
+              <h2 className="font-inter font-semibold text-white mb-4 flex items-center gap-2">
+                <Calendar size={17} className="text-neon-violet" />
+                Step 2 - Schedule Window
+              </h2>
+              <div className="grid md:grid-cols-2 gap-4">
+                <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} className="cyber-input w-full px-4 py-3 text-sm" />
+                <input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} className="cyber-input w-full px-4 py-3 text-sm" />
+                <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} className="cyber-input w-full px-4 py-3 text-sm" />
+                <input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} className="cyber-input w-full px-4 py-3 text-sm" />
+              </div>
+              {windowRange && (
+                <div className="mt-4 rounded-xl border border-neon-amber/20 bg-neon-amber/5 p-4 text-xs font-inter text-white/60">
+                  Students can start only between{' '}
+                  {windowRange.start.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })} and{' '}
+                  {windowRange.end.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}.
+                </div>
+              )}
+            </NeonCard>
 
-                {/* Student list */}
+            <NeonCard variant="magenta" padding="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-inter font-semibold text-white flex items-center gap-2">
+                  <Users size={17} className="text-neon-magenta" />
+                  Step 3 - Assign Students
+                </h2>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setSelectedStudents(filteredStudents.map((student) => student.id))} className="text-xs text-neon-cyan">
+                    Select All
+                  </button>
+                  <span className="text-white/20">·</span>
+                  <button onClick={() => setSelectedStudents([])} className="text-xs text-white/40">
+                    Clear
+                  </button>
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-3 mb-3 text-xs">
+                <p className="text-white/35">
+                  {selectedStudents.length} selected
+                </p>
+                <p className="text-white/25">
+                  {filteredStudents.length} visible
+                </p>
+              </div>
+              <div className="relative mb-4">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25" />
+                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search students..." className="cyber-input w-full pl-9 pr-10 py-2.5 text-sm" />
+                {search && (
+                  <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/25">
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+              {loadingUsers ? (
+                <div className="py-8 text-center text-white/30 text-sm">Loading students...</div>
+              ) : studentLoadError ? (
+                <div className="rounded-xl border border-neon-red/20 bg-neon-red/5 px-4 py-6 text-center">
+                  <p className="text-neon-red text-sm">{studentLoadError}</p>
+                </div>
+              ) : filteredStudents.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-8 text-center">
+                  <p className="text-white/65 text-sm">
+                    {students.length === 0 ? 'No student accounts are available yet.' : 'No students match your search.'}
+                  </p>
+                  <p className="text-white/30 text-xs mt-1">
+                    {students.length === 0 ? 'Create or restore student users to assign this test.' : 'Clear the search to see all available students.'}
+                  </p>
+                </div>
+              ) : (
                 <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                  {filteredStudents.map((s) => {
-                    const isSelected = selectedStu.includes(s.id);
+                  {filteredStudents.map((student) => {
+                    const selected = selectedStudents.includes(student.id);
                     return (
                       <button
-                        key={s.id}
-                        onClick={() => toggleStudent(s.id)}
+                        key={student.id}
+                        onClick={() =>
+                          setSelectedStudents((prev) =>
+                            selected ? prev.filter((id) => id !== student.id) : [...prev, student.id]
+                          )
+                        }
                         className={cn(
-                          'w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all duration-200',
-                          isSelected
-                            ? 'border-neon-magenta/50 bg-neon-magenta/10'
-                            : 'border-white/5 hover:border-white/15 bg-white/[0.015]'
+                          'w-full flex items-center gap-3 p-3 rounded-xl border text-left',
+                          selected ? 'border-neon-magenta/50 bg-neon-magenta/10' : 'border-white/5 bg-white/[0.015]'
                         )}
                       >
-                        {/* Avatar */}
-                        <div className={cn(
-                          'w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold font-inter flex-shrink-0',
-                          isSelected
-                            ? 'bg-neon-magenta/30 text-neon-magenta border border-neon-magenta/40'
-                            : 'bg-white/10 text-white/50 border border-white/10'
-                        )}>
-                          {s.avatar}
+                        <div className={cn('w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold', selected ? 'bg-neon-magenta/30 text-neon-magenta' : 'bg-white/10 text-white/50')}>
+                          {student.avatar}
                         </div>
-
-                        {/* Info */}
                         <div className="flex-1 min-w-0">
-                          <p className={cn('text-sm font-inter font-medium', isSelected ? 'text-neon-magenta' : 'text-white/70')}>
-                            {s.name}
-                          </p>
-                          <p className="text-white/25 text-[11px] font-inter truncate">
-                            {s.email} · {s.batch}
-                          </p>
+                          <p className={cn('text-sm font-medium', selected ? 'text-neon-magenta' : 'text-white/70')}>{student.name}</p>
+                          <p className="text-white/25 text-[11px] truncate">{student.email}</p>
                         </div>
-
-                        {/* Checkbox */}
-                        <div className={cn(
-                          'w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all',
-                          isSelected
-                            ? 'bg-neon-magenta border-neon-magenta'
-                            : 'border-white/15'
-                        )}>
-                          {isSelected && <CheckCircle2 size={12} className="text-white" />}
+                        <div className={cn('w-5 h-5 rounded border-2 flex items-center justify-center', selected ? 'bg-neon-magenta border-neon-magenta' : 'border-white/15')}>
+                          {selected && <CheckCircle2 size={12} className="text-white" />}
                         </div>
                       </button>
                     );
                   })}
                 </div>
-              </NeonCard>
-
-              {/* Error/Success */}
-              {error && (
-                <div className="flex items-center gap-2 p-4 rounded-xl bg-neon-red/8 border border-neon-red/25 animate-fade-in">
-                  <AlertTriangle size={16} className="text-neon-red flex-shrink-0" />
-                  <p className="text-neon-red text-sm font-inter">{error}</p>
-                </div>
               )}
-              {success && (
-                <div className="flex items-center gap-3 p-4 rounded-xl bg-neon-green/8 border border-neon-green/25 animate-fade-in">
-                  <CheckCircle2 size={20} className="text-neon-green" />
-                  <p className="text-neon-green font-inter font-semibold">Test scheduled successfully! Students have been notified.</p>
+            </NeonCard>
+
+            {error && (
+              <div className="flex items-center gap-2 p-4 rounded-xl bg-neon-red/8 border border-neon-red/25">
+                <AlertTriangle size={16} className="text-neon-red flex-shrink-0" />
+                <p className="text-neon-red text-sm">{error}</p>
+              </div>
+            )}
+            {success && (
+              <div className="flex items-center gap-3 p-4 rounded-xl bg-neon-green/8 border border-neon-green/25">
+                <CheckCircle2 size={20} className="text-neon-green" />
+                <p className="text-neon-green font-semibold">{success}</p>
+              </div>
+            )}
+            <HoloButton variant="cyan" size="xl" fullWidth loading={submitting} onClick={handleCreate} icon={<Send size={18} />}>
+              CREATE TEST
+            </HoloButton>
+          </div>
+
+          <div className="space-y-5">
+            <NeonCard variant="default" padding="p-5">
+              <p className="text-white/30 text-xs uppercase tracking-widest mb-4">Rules</p>
+              <div className="space-y-3 text-xs font-inter">
+                <div className="rounded-xl border border-white/8 bg-white/[0.02] p-3">
+                  <div className="flex items-center gap-2 text-white/80 font-semibold"><Lock size={13} className="text-neon-amber" />One attempt only</div>
+                  <p className="text-white/35 mt-1">Students cannot reattempt after submission or expiry.</p>
                 </div>
-              )}
-
-              {/* Create button */}
-              <HoloButton
-                variant="cyan"
-                size="xl"
-                fullWidth
-                loading={isSubmitting}
-                onClick={handleCreate}
-                icon={<Send size={18} />}
-                className="font-orbitron tracking-widest"
-              >
-                CREATE &amp; SCHEDULE TEST
-              </HoloButton>
-            </div>
-
-            {/* ── Right col (1/3): Summary + Scheduled list ──── */}
-            <div className="space-y-5">
-
-              {/* Config summary */}
-              <NeonCard variant="default" padding="p-5" className="animate-fade-up-delay">
-                <p className="text-white/30 text-xs uppercase tracking-widest font-inter mb-4">Configuration Summary</p>
-                <div className="space-y-3">
-                  {[
-                    { label: 'Title',      value: testTitle || '—',   color: 'text-white/60' },
-                    { label: 'Topic',      value: testTopic,           color: 'text-neon-cyan' },
-                    { label: 'Questions',  value: `${questionCount}Q`, color: 'text-neon-green' },
-                    { label: 'Time',       value: `${timeLimit} min`,  color: 'text-neon-amber' },
-                    { label: 'Students',   value: `${selectedStu.length} assigned`, color: 'text-neon-magenta' },
-                    { label: 'Difficulty', value: testDifficulty === 'all' ? 'Mixed' : testDifficulty, color: 'text-neon-violet' },
-                  ].map(item => (
-                    <div key={item.label} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.02] border border-white/5">
-                      <span className="text-white/25 text-xs font-inter">{item.label}</span>
-                      <span className={cn('text-xs font-mono-code font-semibold truncate max-w-[120px]', item.color)}>{item.value}</span>
-                    </div>
-                  ))}
+                <div className="rounded-xl border border-white/8 bg-white/[0.02] p-3">
+                  <div className="flex items-center gap-2 text-white/80 font-semibold"><Bell size={13} className="text-neon-cyan" />In-app notification</div>
+                  <p className="text-white/35 mt-1">Selected students are notified automatically when the test is created.</p>
                 </div>
-              </NeonCard>
-
-              {/* Scheduled Tests list */}
-              <NeonCard variant="default" padding="p-5" className="animate-fade-up-delay">
-                <h3 className="font-inter font-semibold text-white mb-4 flex items-center gap-2">
-                  <Clock size={15} className="text-neon-cyan" />
-                  Scheduled Tests
-                </h3>
-                <div className="space-y-3">
-                  {scheduledTests.map(test => {
-                    const status = test.status as TestStatus || getStatus(test.startTime);
-                    return (
-                      <div key={test.id} className={cn(
-                        'p-3.5 rounded-xl border',
-                        status === 'locked'    ? 'border-neon-amber/20 bg-neon-amber/5'
-                        : status === 'live'    ? 'border-neon-green/20 bg-neon-green/5'
-                        : 'border-white/8 bg-white/[0.02]'
-                      )}>
-                        <div className="flex items-start justify-between gap-2 mb-2">
-                          <p className="text-white/80 text-xs font-inter font-medium leading-snug flex-1">{test.title}</p>
-                          <StatusBadge status={status} />
-                        </div>
-                        <div className="flex items-center gap-3 text-[11px] text-white/30 font-inter">
-                          <span className="flex items-center gap-1">
-                            <Users size={10} /> {test.students} students
-                          </span>
-                          <span>·</span>
-                          <span className="flex items-center gap-1">
-                            <Clock size={10} />
-                            {test.startTime.toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
-                          </span>
-                        </div>
-                        {status === 'locked' && (
-                          <div className="mt-2 flex items-center gap-1 text-[10px] text-neon-amber/60 font-mono-code">
-                            <Lock size={9} />
-                            Unlocks: {test.startTime.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </NeonCard>
-
-              {/* Info card */}
-              <div className="p-4 rounded-xl border border-neon-violet/15 bg-neon-violet/5">
-                <div className="flex items-start gap-3">
-                  <Shield size={16} className="text-neon-violet flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-neon-violet text-xs font-inter font-semibold mb-1">Student View</p>
-                    <p className="text-white/30 text-[11px] font-inter leading-relaxed">
-                      Before the start time, students see a holographic "Test will unlock at [time]" message on their dashboard. The test becomes available at exactly the scheduled time.
-                    </p>
-                  </div>
+                <div className="rounded-xl border border-white/8 bg-white/[0.02] p-3">
+                  <div className="flex items-center gap-2 text-white/80 font-semibold"><Shield size={13} className="text-neon-violet" />Timed access</div>
+                  <p className="text-white/35 mt-1">Start Test is available only inside the scheduled window.</p>
                 </div>
               </div>
-            </div>
+            </NeonCard>
+
+            <NeonCard variant="default" padding="p-5">
+              <p className="text-white/30 text-xs uppercase tracking-widest mb-4">Summary</p>
+              <div className="space-y-3">
+                {[
+                  ['Title', title || '-'],
+                  ['Workbook', workbook?.name || 'Not selected'],
+                  ['Duration', `${timeLimit} min`],
+                  ['Students', `${selectedStudents.length} assigned`],
+                  ['Questions', uploadResult ? `${uploadResult.summary.validRows} ready` : 'Parsed on create'],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.02] border border-white/5 gap-3">
+                    <span className="text-white/25 text-xs">{label}</span>
+                    <span className="text-white/70 text-xs text-right break-all">{value}</span>
+                  </div>
+                ))}
+              </div>
+            </NeonCard>
+
+            <NeonCard variant="default" padding="p-5">
+              <h3 className="font-inter font-semibold text-white mb-4 flex items-center gap-2">
+                <Clock size={15} className="text-neon-cyan" />
+                Scheduled Tests
+              </h3>
+              <div className="space-y-3">
+                {scheduledTests.map((test) => (
+                  <div key={test.id} className="p-3.5 rounded-xl border border-white/8 bg-white/[0.02]">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <p className="text-white/80 text-xs font-medium leading-snug flex-1">{test.title}</p>
+                      <span className={cn('inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px]', test.status === 'locked' ? 'border-neon-amber/40 bg-neon-amber/10 text-neon-amber' : test.status === 'live' ? 'border-neon-green/40 bg-neon-green/10 text-neon-green' : 'border-white/15 bg-white/5 text-white/40')}>
+                        {test.status}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-white/35 font-inter">
+                      {test.questionCount} questions · {test.students} students
+                    </div>
+                    <div className="mt-2 text-[10px] text-white/35 font-mono-code">
+                      {test.startTime.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                      {'  '}to{'  '}
+                      {test.endTime.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                    </div>
+                  </div>
+                ))}
+                {scheduledTests.length === 0 && <p className="text-white/30 text-sm">Tests you create here will appear in this list.</p>}
+              </div>
+            </NeonCard>
           </div>
         </div>
       </div>
