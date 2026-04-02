@@ -9,10 +9,11 @@
 
 import { Request, Response } from 'express';
 import mongoose from 'mongoose';
-import Question from '../models/Question';
+import Question, { OPTION_LETTERS } from '../models/Question';
 import TestAttempt from '../models/TestAttempt';
 import asyncHandler from '../utils/asyncHandler';
 import { successResponse, errorResponse } from '../utils/ApiResponse';
+import { normalizeQuestions } from '../utils/normalizeQuestion';
 
 // ═══════════════════════════════════════════════════════════════
 // @desc    Start a new test attempt
@@ -67,6 +68,7 @@ export const startTest = asyncHandler(async (req: Request, res: Response) => {
       },
     },
   ]);
+  const normalizedQuestions = normalizeQuestions(questions);
 
   // ─── Step 5: TestAttempt create karo (empty answers) ───────
   const attempt = await TestAttempt.create({
@@ -90,7 +92,7 @@ export const startTest = asyncHandler(async (req: Request, res: Response) => {
       attemptId: attempt._id,  // Submit ke time yahi ID chahiye
       title: attempt.title,
       totalQuestions: questionCount,
-      questions,               // correctAnswer nahi hai inme!
+      questions: normalizedQuestions, // correctAnswer nahi hai inme!
     })
   );
 });
@@ -133,10 +135,11 @@ export const submitTest = asyncHandler(async (req: Request, res: Response) => {
   // Ab correctAnswer chahiye — isliye ab bhej rahe hain, test ke waqt nahi
   const questionIds = attempt.questions;
   const questionsFromDB = await Question.find({ _id: { $in: questionIds } });
+  const normalizedQuestions = normalizeQuestions(questionsFromDB);
 
   // Quick lookup ke liye Map banao: questionId → question object
   const questionMap = new Map(
-    questionsFromDB.map((q) => [q._id.toString(), q])
+    normalizedQuestions.map((q) => [q._id.toString(), q])
   );
 
   // ─── Step 5: Har answer evaluate karo ─────────────────────
@@ -176,7 +179,27 @@ export const submitTest = asyncHandler(async (req: Request, res: Response) => {
     }
 
     // ─── Correct/Incorrect check ───────────────────────────
-    const isCorrect = question?.correctAnswer === submittedAnswer.selectedAnswer;
+    const selectedAnswer = submittedAnswer.selectedAnswer?.toUpperCase();
+    const isValidAnswer = OPTION_LETTERS.includes(selectedAnswer as (typeof OPTION_LETTERS)[number]);
+    const normalizedAnswer = isValidAnswer ? selectedAnswer : '';
+    const isCorrect = question?.correctAnswer === normalizedAnswer;
+
+    if (!normalizedAnswer) {
+      skippedCount++;
+      if (question) {
+        const topic = question.topic;
+        if (!topicPerformance[topic]) topicPerformance[topic] = { correct: 0, total: 0 };
+        topicPerformance[topic].total++;
+      }
+
+      return {
+        question: new mongoose.Types.ObjectId(qIdStr),
+        selectedAnswer: '',
+        isCorrect: false,
+        timeSpent: submittedAnswer.timeSpent || 0,
+      };
+    }
+
     if (isCorrect) {
       correctCount++;
     } else {
@@ -193,7 +216,7 @@ export const submitTest = asyncHandler(async (req: Request, res: Response) => {
 
     return {
       question: new mongoose.Types.ObjectId(qIdStr),
-      selectedAnswer: submittedAnswer.selectedAnswer,
+      selectedAnswer: normalizedAnswer,
       isCorrect,
       timeSpent: submittedAnswer.timeSpent || 0,
     };
@@ -294,8 +317,13 @@ export const getAttemptById = asyncHandler(
       return;
     }
 
+    const normalizedAttempt = {
+      ...attempt,
+      questions: normalizeQuestions((attempt.questions || []) as unknown[]),
+    };
+
     res.status(200).json(
-      successResponse('Test attempt detail mil gayi!', attempt)
+      successResponse('Test attempt detail mil gayi!', normalizedAttempt)
     );
   }
 );

@@ -10,7 +10,7 @@ dotenv.config();
 import mongoose from 'mongoose';
 import Question from './models/Question';
 
-const sampleQuestions = [
+const rawSampleQuestions = [
   // ─── Quantitative Aptitude ─────────────────────────────────
   {
     topic: 'Quantitative Aptitude', subtopic: 'Percentage', concept: 'Basic',
@@ -177,6 +177,27 @@ const sampleQuestions = [
     difficulty: 'easy',
   },
 ];
+
+const sampleQuestions = rawSampleQuestions.map((question) => {
+  const correctOptionIndex = question.options.findIndex(
+    (option) => option === question.correctAnswer
+  );
+
+  if (correctOptionIndex === -1) {
+    throw new Error(`Correct answer "${question.correctAnswer}" was not found in options.`);
+  }
+
+  return {
+    topic: question.topic,
+    subtopic: question.subtopic,
+    difficulty: question.difficulty,
+    questionText: question.questionText,
+    questionImage: undefined,
+    options: question.options.map((option) => ({ text: option })),
+    correctAnswer: ['A', 'B', 'C', 'D'][correctOptionIndex],
+    explanation: question.explanation,
+  };
+});
 
 const seedDB = async () => {
   try {

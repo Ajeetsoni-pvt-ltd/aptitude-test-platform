@@ -7,6 +7,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { Request, Response, NextFunction } from 'express';
+import multer from 'multer';
 
 // Custom Error Interface: additional fields ke liye
 interface AppError extends Error {
@@ -56,6 +57,15 @@ const errorHandler = (
   if (err.name === 'ValidationError') {
     statusCode = 400;
     message = 'Validation failed: ' + err.message;
+  }
+
+  if (err.name === 'MulterError') {
+    const multerError = err as unknown as multer.MulterError;
+    statusCode = 400;
+    message =
+      multerError.code === 'LIMIT_FILE_SIZE'
+        ? 'Uploaded file is too large.'
+        : multerError.message;
   }
 
   // ─── Send Error Response ───────────────────────────────────
