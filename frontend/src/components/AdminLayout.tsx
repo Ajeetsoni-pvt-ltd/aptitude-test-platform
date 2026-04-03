@@ -155,9 +155,10 @@ const SidebarContent = ({
 
   return (
     <div className="flex h-full flex-col">
+      {/* Header/Logo Section */}
       <div className="border-b border-white/8 px-4 py-4">
         <div className="flex items-center gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-2xl border border-neon-cyan/30 bg-neon-cyan/12 text-neon-cyan shadow-[0_0_24px_rgba(0,245,255,0.2)]">
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-neon-cyan/30 bg-neon-cyan/12 text-neon-cyan shadow-[0_0_24px_rgba(0,245,255,0.2)]">
             <Sparkles className="h-5 w-5" />
           </div>
           {!collapsed && (
@@ -171,7 +172,8 @@ const SidebarContent = ({
         </div>
       </div>
 
-      <div className="px-3 pb-2 pt-4">
+      {/* Navigation Items */}
+      <div className="flex-1 overflow-y-auto px-3 pb-2 pt-4">
         {!collapsed && (
           <p className="px-2 pb-3 text-[11px] uppercase tracking-[0.34em] text-white/25">
             Navigation
@@ -182,24 +184,39 @@ const SidebarContent = ({
             const active = isNavItemActive(currentPath, item);
             const Icon = item.icon;
             return (
-              <motion.div key={item.path} whileHover={{ x: collapsed ? 0 : 4 }} transition={{ duration: 0.2 }}>
+              <motion.div
+                key={item.path}
+                whileHover={{  x: collapsed ? 0 : 4 }}
+                whileTap={{ scale: 0.98 }}
+                transition={{ duration: 0.2 }}
+              >
                 <NavLink
                   to={item.path}
                   end={item.exact}
                   onClick={onNavigate}
                   className={cn(
                     'group relative flex items-center gap-3 rounded-2xl border px-3 py-3 transition-all duration-300',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-cyan/50',
                     active
-                      ? NAV_TONE_CLASSES[item.tone]
-                      : 'border-transparent bg-white/[0.02] text-white/55 hover:border-white/10 hover:bg-white/[0.05] hover:text-white'
+                      ? `${NAV_TONE_CLASSES[item.tone]} shadow-lg`
+                      : 'border-transparent bg-white/[0.02] text-white/55 hover:border-white/10 hover:bg-white/[0.05] hover:text-white/80'
                   )}
                 >
+                  {/* Background accent bar for active state */}
+                  {active && (
+                    <motion.div
+                      layoutId="active-bg"
+                      transition={{ duration: 0.3 }}
+                      className="absolute inset-0 rounded-2xl -z-10"
+                    />
+                  )}
+
                   <div
                     className={cn(
-                      'grid h-10 w-10 shrink-0 place-items-center rounded-2xl border transition-colors duration-300',
+                      'grid h-10 w-10 shrink-0 place-items-center rounded-2xl border transition-all duration-300',
                       active
-                        ? 'border-current/30 bg-current/10'
-                        : 'border-white/8 bg-white/[0.03] text-white/45 group-hover:border-white/15 group-hover:text-white/70'
+                        ? 'border-current/30 bg-current/10 shadow-[0_0_12px_currentColor]'
+                        : 'border-white/8 bg-white/[0.03] text-white/45 group-hover:border-white/15 group-hover:bg-white/[0.06] group-hover:text-white/70'
                     )}
                   >
                     <Icon className="h-4.5 w-4.5" />
@@ -210,6 +227,14 @@ const SidebarContent = ({
                       <p className="truncate text-xs text-white/35">{item.description}</p>
                     </div>
                   )}
+                  {active && !collapsed && (
+                    <motion.div
+                      initial={{ opacity: 0, x: -4 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -4 }}
+                      className="h-1.5 w-1.5 rounded-full bg-current"
+                    />
+                  )}
                 </NavLink>
               </motion.div>
             );
@@ -217,29 +242,38 @@ const SidebarContent = ({
         </nav>
       </div>
 
-      <div className="mt-auto space-y-3 border-t border-white/8 px-3 py-4">
-        <button
+      {/* Bottom Section - Actions and User Info */}
+      <div className="space-y-3 border-t border-white/8 px-3 py-4">
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
           type="button"
           onClick={() => {
             onNavigate();
             navigate('/dashboard');
           }}
-          className="flex w-full items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-3 text-left text-white/60 transition-all hover:border-white/14 hover:bg-white/[0.05] hover:text-white"
+          className={cn(
+            'flex w-full items-center gap-3 rounded-2xl border transition-all duration-300',
+            'border-white/8 bg-white/[0.03] px-3 py-3 text-left text-white/60',
+            'hover:border-white/14 hover:bg-white/[0.05] hover:text-white',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-cyan/50'
+          )}
         >
-          <div className="grid h-10 w-10 place-items-center rounded-2xl border border-white/10 bg-white/[0.04]">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/[0.04] transition-colors group-hover:border-white/15">
             <ArrowRightLeft className="h-4 w-4" />
           </div>
           {!collapsed && (
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-medium">Student View</p>
               <p className="text-xs text-white/35">Return to the learner dashboard</p>
             </div>
           )}
-        </button>
+        </motion.button>
 
-        <div className="rounded-3xl border border-white/8 bg-white/[0.04] px-3 py-3">
+        {/* User Profile Card */}
+        <div className="rounded-3xl border border-white/8 bg-white/[0.04] px-3 py-3 transition-all duration-300">
           <div className="flex items-center gap-3">
-            <div className="grid h-11 w-11 place-items-center rounded-2xl border border-neon-magenta/20 bg-neon-magenta/10 font-orbitron text-sm tracking-[0.18em] text-neon-magenta">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-neon-magenta/20 bg gradient-to-br from-neon-magenta/10 to-neon-magenta/5 font-orbitron text-sm tracking-[0.18em] text-neon-magenta shadow-[0_0_12px_rgba(255,0,170,0.1)]">
               {getInitials(user?.name)}
             </div>
             {!collapsed && (
@@ -249,23 +283,29 @@ const SidebarContent = ({
               </div>
             )}
             {!collapsed && (
-              <button
+              <motion.button
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.95 }}
                 type="button"
                 onClick={handleLogout}
-                className="grid h-10 w-10 place-items-center rounded-2xl border border-neon-red/20 bg-neon-red/10 text-neon-red transition-all hover:scale-105 hover:shadow-[0_0_24px_rgba(255,51,102,0.2)]"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-neon-red/20 bg-neon-red/10 text-neon-red transition-all hover:border-neon-red/40 hover:bg-neon-red/20 hover:shadow-[0_0_24px_rgba(255,51,102,0.2)]"
+                aria-label="Logout"
               >
                 <LogOut className="h-4 w-4" />
-              </button>
+              </motion.button>
             )}
           </div>
           {collapsed && (
-            <button
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               type="button"
               onClick={handleLogout}
-              className="mt-3 grid h-10 w-full place-items-center rounded-2xl border border-neon-red/20 bg-neon-red/10 text-neon-red transition-all hover:shadow-[0_0_24px_rgba(255,51,102,0.2)]"
+              className="mt-3 grid h-10 w-full place-items-center rounded-2xl border border-neon-red/20 bg-neon-red/10 text-neon-red transition-all hover:border-neon-red/40 hover:bg-neon-red/20 hover:shadow-[0_0_24px_rgba(255,51,102,0.2)]"
+              aria-label="Logout"
             >
               <LogOut className="h-4 w-4" />
-            </button>
+            </motion.button>
           )}
         </div>
       </div>
@@ -287,6 +327,17 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
     return window.localStorage.getItem('aetherexam-admin-collapsed') === '1';
   });
   const [unreadCount, setUnreadCount] = useState(0);
+
+  // Close mobile drawer on escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && mobileOpen) {
+        setMobileOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [mobileOpen]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -327,8 +378,14 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
     navigate('/login', { replace: true });
   };
 
+  // Calculate sidebar width for proper main content padding
+  const sidebarCollapsedWidth = 96; // w-24 in pixels (6rem)
+  const sidebarExpandedWidth = 280; // w-70 in pixels (17.5rem)
+  const currentSidebarWidth = collapsed ? sidebarCollapsedWidth : sidebarExpandedWidth;
+
   return (
-    <div className="admin-surface min-h-screen text-white">
+    <div className="flex min-h-screen w-full overflow-hidden bg-cyber-black text-white">
+      {/* Background effects layer */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute inset-0 bg-[linear-gradient(rgba(0,245,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,245,255,0.03)_1px,transparent_1px)] bg-[size:90px_90px] opacity-50" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_44%)] opacity-40" />
@@ -356,6 +413,25 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         ))}
       </div>
 
+      {/* Desktop Sidebar - Visible on lg and up */}
+      <motion.aside
+        initial={{ width: currentSidebarWidth }}
+        animate={{ width: collapsed ? sidebarCollapsedWidth : sidebarExpandedWidth }}
+        transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+        className="hidden shrink-0 lg:flex flex-col h-screen sticky top-0 z-40"
+      >
+        <div className="admin-panel h-full p-0 rounded-r-3xl m-4 border-l border-t border-b border-white/8 overflow-hidden flex flex-col">
+          <SidebarContent
+            collapsed={collapsed}
+            currentPath={location.pathname}
+            onNavigate={() => undefined}
+            navigate={navigate}
+            handleLogout={handleLogout}
+          />
+        </div>
+      </motion.aside>
+
+      {/* Mobile Overlay and Drawer */}
       <AnimatePresence>
         {mobileOpen && (
           <>
@@ -363,22 +439,29 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-40 bg-[#02040d]/80 backdrop-blur-sm lg:hidden"
+              transition={{ duration: 0.2 }}
               onClick={() => setMobileOpen(false)}
+              className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm lg:hidden"
+              aria-hidden="true"
             />
             <motion.aside
-              initial={{ x: -24, opacity: 0 }}
+              initial={{ x: -280, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
-              exit={{ x: -24, opacity: 0 }}
-              transition={{ duration: 0.24 }}
-              className="fixed inset-y-4 left-4 z-50 w-[18rem] lg:hidden"
+              exit={{ x: -280, opacity: 0 }}
+              transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+              className="fixed inset-y-0 left-0 z-40 w-[280px] overflow-y-auto lg:hidden"
             >
-              <div className="admin-panel h-full border-neon-cyan/18 p-0">
-                <div className="flex items-center justify-end border-b border-white/8 px-4 py-3">
+              <div className="admin-panel h-full p-0 m-4 rounded-3xl border border-white/8 overflow-hidden flex flex-col">
+                <div className="flex items-center justify-between border-b border-white/8 px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-neon-cyan" />
+                    <span className="font-orbitron text-sm tracking-[0.24em] text-white hidden sm:inline">AetherExam</span>
+                  </div>
                   <button
                     type="button"
                     onClick={() => setMobileOpen(false)}
                     className="grid h-10 w-10 place-items-center rounded-2xl border border-white/10 bg-white/[0.04] text-white/65 transition-all hover:border-white/18 hover:text-white"
+                    aria-label="Close menu"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -396,35 +479,17 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         )}
       </AnimatePresence>
 
-      <motion.aside
-        animate={{ width: collapsed ? 96 : 280 }}
-        transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-        className="fixed inset-y-4 left-4 z-40 hidden lg:block"
-      >
-        <div className="admin-panel h-full p-0">
-          <SidebarContent
-            collapsed={collapsed}
-            currentPath={location.pathname}
-            onNavigate={() => undefined}
-            navigate={navigate}
-            handleLogout={handleLogout}
-          />
-        </div>
-      </motion.aside>
-
-      <div
-        className={cn(
-          'relative z-10 min-h-screen transition-[padding] duration-300',
-          collapsed ? 'lg:pl-[7rem]' : 'lg:pl-[18.5rem]'
-        )}
-      >
-        <header className="sticky top-0 z-30 px-4 pt-4 sm:px-5 lg:px-8">
-          <div className="admin-panel flex items-center justify-between gap-4 px-4 py-3 sm:px-5">
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Header */}
+        <header className="sticky top-0 z-30 border-b border-white/8 backdrop-blur-sm">
+          <div className="admin-panel mx-4 mt-4 flex items-center justify-between gap-4 px-4 py-3 sm:px-5">
             <div className="flex min-w-0 items-center gap-3">
               <button
                 type="button"
                 onClick={() => setMobileOpen(true)}
                 className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/[0.04] text-white/70 transition-all hover:border-white/18 hover:text-white lg:hidden"
+                aria-label="Open menu"
               >
                 <Menu className="h-4 w-4" />
               </button>
@@ -432,6 +497,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                 type="button"
                 onClick={() => setCollapsed((value) => !value)}
                 className="hidden h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/[0.04] text-white/70 transition-all hover:border-white/18 hover:text-white lg:grid"
+                aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               >
                 {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
               </button>
@@ -451,11 +517,12 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-2 shrink-0 sm:gap-3">
               <button
                 type="button"
                 onClick={() => navigate('/notifications')}
                 className="relative grid h-11 w-11 place-items-center rounded-2xl border border-white/10 bg-white/[0.04] text-white/72 transition-all hover:border-neon-cyan/24 hover:text-neon-cyan"
+                aria-label="Notifications"
               >
                 <Bell className="h-4 w-4" />
                 {unreadCount > 0 && (
@@ -466,7 +533,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
               </button>
 
               <div className="hidden items-center gap-3 rounded-[22px] border border-white/10 bg-white/[0.04] px-3 py-2 sm:flex">
-                <div className="grid h-10 w-10 place-items-center rounded-2xl border border-neon-cyan/24 bg-neon-cyan/10 font-orbitron text-sm tracking-[0.16em] text-neon-cyan">
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-neon-cyan/24 bg-neon-cyan/10 font-orbitron text-sm tracking-[0.16em] text-neon-cyan">
                   {getInitials(user?.name)}
                 </div>
                 <div className="min-w-0">
@@ -480,15 +547,18 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
           </div>
         </header>
 
-        <main className="px-4 pb-8 pt-6 sm:px-5 lg:px-8">
-          <motion.div
-            key={location.pathname}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-          >
-            {children}
-          </motion.div>
+        {/* Main Content */}
+        <main className="flex-1 overflow-y-auto">
+          <div className="px-4 pb-8 pt-6 sm:px-5 lg:px-8">
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+            >
+              {children}
+            </motion.div>
+          </div>
         </main>
       </div>
     </div>
