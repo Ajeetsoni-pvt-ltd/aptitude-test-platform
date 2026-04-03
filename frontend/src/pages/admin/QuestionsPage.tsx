@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   Eye,
@@ -27,6 +27,8 @@ import {
   deleteQuestionApi,
   getQuestionsAdminApi,
   updateQuestionApi,
+  getAllTopicsApi,
+  getSubtopicsForTopicApi,
 } from '@/api/adminApi';
 import { getAssetUrl, getOptionLetter } from '@/lib/question';
 import type { Question } from '@/types';
@@ -43,7 +45,6 @@ type EditState = {
   explanation: string;
 };
 
-const TOPICS = ['', 'Quantitative Aptitude', 'Verbal Ability', 'Logical Reasoning'];
 const DIFFICULTY_TONE: Record<Question['difficulty'], 'green' | 'amber' | 'red'> = {
   easy: 'green',
   medium: 'amber',
@@ -81,12 +82,30 @@ const validateEdit = (state: EditState) => {
 
 const QuestionsPage = () => {
   const navigate = useNavigate();
+  const observerTarget = useRef<HTMLDivElement>(null);
+
+  // State management
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [search, setSearch] = useState('');
   const [topic, setTopic] = useState('');
   const [subtopic, setSubtopic] = useState('');
   const [difficulty, setDifficulty] = useState('');
+  const [questionType, setQuestionType] = useState('');
+
+  // Dynamic filter data
+  const [topics, setTopics] = useState<string[]>([]);
+  const [subtopics, setSubtopics] = useState<string[]>([]);
+  const [topicsLoading, setTopicsLoading] = useState(false);
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalQuestions, setTotalQuestions] = useState(0);
+  const [pageSize] = useState(50);
+
+  // UI state
   const [previewQuestion, setPreviewQuestion] = useState<Question | null>(null);
   const [editState, setEditState] = useState<EditState | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
@@ -97,41 +116,126 @@ const QuestionsPage = () => {
     null
   );
 
-  const fetchQuestions = async () => {
-    setIsLoading(true);
-    try {
-      const response = await getQuestionsAdminApi(1, 150, topic, difficulty);
-      if (response.success && response.data) {
-        setQuestions(response.data.questions || []);
-      }
-    } catch {
-      setNotice({ type: 'error', message: 'Question bank could not be loaded right now.' });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // Load all topics on mount
   useEffect(() => {
-    fetchQuestions();
-  }, [topic, difficulty]);
+    const loadTopics = async () => {
+      setTopicsLoading(true);
+      try {
+        const response = await getAllTopicsApi();
+        if (response.success && response.data?.topics) {
+          setTopics(response.data.topics);
+        }
+      } catch (error) {
+        console.error('Failed to load topics:', error);
+      } finally {
+        setTopicsLoading(false);
+      }
+    };
 
-  const availableSubtopics = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          questions
-            .map((question) => question.subtopic?.trim())
-            .filter((value): value is string => Boolean(value))
-        )
-      ).sort(),
-    [questions]
+    loadTopics();
+  }, []);
+
+  // Load subtopics when topic changes
+  useEffect(() => {
+    const loadSubtopics = async () => {
+      if (!topic) {
+        setSubtopics([]);
+        setSubtopic('');
+        return;
+      }
+
+      try {
+        const response = await getSubtopicsForTopicApi(topic);
+        if (response.success && response.data?.subtopics) {
+          setSubtopics(response.data.subtopics);
+        }
+      } catch (error) {
+        console.error('Failed to load subtopics:', error);
+        setSubtopics([]);
+      }
+    };
+
+    loadSubtopics();
+  }, [topic]);
+
+  // Fetch questions with current filters
+  const fetchQuestions = useCallback(
+    async (page: number) => {
+      setIsLoading(true);
+      try {
+        const response = await getQuestionsAdminApi(
+          page,
+          pageSize,
+          topic,
+          difficulty,
+          questionType
+        );
+
+        if (response.success && response.data) {
+          const newQuestions = response.data.questions || [];
+
+          if (page === 1) {
+            setQuestions(newQuestions);
+          } else {
+            setQuestions((prev) => [...prev, ...newQuestions]);
+          }
+
+          setTotalPages(response.data.pagination.totalPages);
+          setTotalQuestions(response.data.pagination.totalQuestions);
+          setCurrentPage(page);
+        }
+      } catch (error) {
+        setNotice({
+          type: 'error',
+          message: 'Question bank could not be loaded right now.',
+        });
+      } finally {
+        setIsLoading(false);
+        setIsInitialLoad(false);
+      }
+    },
+    [topic, difficulty, questionType, pageSize]
   );
 
+  // Load questions when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+    setQuestions([]);
+    fetchQuestions(1);
+  }, [topic, difficulty, questionType]);
+
+  // Infinite scroll observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (
+          entries[0].isIntersecting &&
+          !isLoading &&
+          currentPage < totalPages &&
+          questions.length > 0
+        ) {
+          fetchQuestions(currentPage + 1);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => {
+      if (observerTarget.current) {
+        observer.unobserve(observerTarget.current);
+      }
+    };
+  }, [isLoading, currentPage, totalPages, questions.length, fetchQuestions]);
+
   const filteredQuestions = useMemo(() => {
+    if (!search.trim()) return questions;
+
     const keyword = search.trim().toLowerCase();
     return questions.filter((question) => {
-      if (subtopic && question.subtopic !== subtopic) return false;
-      if (!keyword) return true;
       const haystack = [
         question.topic,
         question.subtopic,
@@ -144,12 +248,17 @@ const QuestionsPage = () => {
         .toLowerCase();
       return haystack.includes(keyword);
     });
-  }, [questions, search, subtopic]);
+  }, [questions, search]);
 
-  const imageCount = filteredQuestions.filter(
-    (question) =>
-      Boolean(question.questionImage) || question.options.some((option) => Boolean(option.image))
-  ).length;
+  const imageCount = useMemo(
+    () =>
+      filteredQuestions.filter(
+        (question) =>
+          Boolean(question.questionImage) ||
+          question.options.some((option) => Boolean(option.image))
+      ).length,
+    [filteredQuestions]
+  );
 
   const bulkDeleteScopeLabel = useMemo(() => {
     if (!topic) {
@@ -177,6 +286,8 @@ const QuestionsPage = () => {
     setTopic('');
     setSubtopic('');
     setDifficulty('');
+    setQuestionType('');
+    setCurrentPage(1);
   };
 
   const handleDelete = async (questionId: string) => {
@@ -190,8 +301,7 @@ const QuestionsPage = () => {
     } catch (error: any) {
       setNotice({
         type: 'error',
-        message:
-          error?.response?.data?.message || 'Question could not be deleted.',
+        message: error?.response?.data?.message || 'Question could not be deleted.',
       });
     } finally {
       setBusyId(null);
@@ -228,7 +338,9 @@ const QuestionsPage = () => {
         setPreviewQuestion(null);
         setEditState(null);
         setNotice({ type: 'success', message: response.message });
-        await fetchQuestions();
+        setCurrentPage(1);
+        setQuestions([]);
+        await fetchQuestions(1);
       } else {
         setNotice({
           type: 'error',
@@ -238,8 +350,7 @@ const QuestionsPage = () => {
     } catch (error: any) {
       setNotice({
         type: 'error',
-        message:
-          error?.response?.data?.message || 'Bulk delete could not be completed.',
+        message: error?.response?.data?.message || 'Bulk delete could not be completed.',
       });
     } finally {
       setBulkDeleting(false);
@@ -306,7 +417,7 @@ const QuestionsPage = () => {
               Question <span className="gradient-text-cyan-violet">Bank</span>
             </>
           }
-          description="Search the bank, filter by topic and difficulty, preview mixed-format questions, and edit or retire entries without leaving the new admin suite."
+          description="Access all topics and subtopics, filter by question type, and manage the complete question database with advanced filtering and infinite scroll."
           actions={
             <>
               <HoloButton
@@ -342,7 +453,7 @@ const QuestionsPage = () => {
             </div>
           </AdminPanel>
 
-          <AdminPanel tone="violet" title="Filters" description="Focus on one topic cluster or difficulty band.">
+          <AdminPanel tone="violet" title="Filters" description="Focus on topics, subtopics, difficulty, and question type.">
             <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-1">
               <select
                 value={topic}
@@ -350,24 +461,26 @@ const QuestionsPage = () => {
                   setTopic(event.target.value);
                   setSubtopic('');
                 }}
-                className="admin-input admin-select px-4 py-3 text-sm"
+                disabled={topicsLoading}
+                className="admin-input admin-select px-4 py-3 text-sm disabled:opacity-50"
               >
-                <option value="">All Topics</option>
-                {TOPICS.filter(Boolean).map((option) => (
-                  <option key={option} value={option}>
-                    {option}
+                <option value="">All Topics ({topics.length})</option>
+                {topics.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
                   </option>
                 ))}
               </select>
               <select
                 value={subtopic}
                 onChange={(event) => setSubtopic(event.target.value)}
-                className="admin-input admin-select px-4 py-3 text-sm"
+                disabled={!topic || subtopics.length === 0}
+                className="admin-input admin-select px-4 py-3 text-sm disabled:opacity-50"
               >
-                <option value="">All Subtopics</option>
-                {availableSubtopics.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
+                <option value="">All Subtopics ({subtopics.length})</option>
+                {subtopics.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
                   </option>
                 ))}
               </select>
@@ -381,6 +494,15 @@ const QuestionsPage = () => {
                 <option value="medium">Medium</option>
                 <option value="hard">Hard</option>
               </select>
+              <select
+                value={questionType}
+                onChange={(event) => setQuestionType(event.target.value)}
+                className="admin-input admin-select px-4 py-3 text-sm md:col-span-3 xl:col-span-1"
+              >
+                <option value="">All Question Types</option>
+                <option value="text-only">Text-Only</option>
+                <option value="image-rich">Image-Rich</option>
+              </select>
             </div>
           </AdminPanel>
 
@@ -391,6 +513,7 @@ const QuestionsPage = () => {
                 <p className="mt-2 font-orbitron text-3xl tracking-[0.08em] text-neon-amber">
                   {filteredQuestions.length}
                 </p>
+                <p className="mt-1 text-xs text-white/45">of {totalQuestions} total</p>
               </div>
               <div className="rounded-[22px] border border-white/8 bg-white/[0.03] px-4 py-4">
                 <p className="text-[11px] uppercase tracking-[0.3em] text-white/30">Image Rich</p>
@@ -405,7 +528,7 @@ const QuestionsPage = () => {
                 <p className="mt-2 text-sm leading-6 text-white/62">{bulkDeleteScopeLabel}</p>
                 <p className="mt-2 text-xs text-white/35">
                   {topic
-                    ? `${bulkDeleteLoadedCount} loaded questions match this scope right now.`
+                    ? `${bulkDeleteLoadedCount} total questions match this scope.`
                     : 'Choose a topic to unlock the delete action.'}
                 </p>
                 <p className="mt-2 text-xs text-white/35">
@@ -443,8 +566,8 @@ const QuestionsPage = () => {
           </div>
         ) : null}
 
-        {isLoading ? (
-          <AdminPanel tone="cyan" title="Loading Bank" description="Gathering the latest question records.">
+        {isInitialLoad && isLoading ? (
+          <AdminPanel tone="cyan" title="Loading Bank" description="Fetching all available questions and metadata.">
             <div className="flex min-h-[320px] flex-col items-center justify-center gap-5">
               <div className="h-14 w-14 rounded-full border-2 border-neon-cyan/30 border-t-neon-cyan animate-spin" />
               <p className="font-orbitron text-xs uppercase tracking-[0.34em] text-neon-cyan/80">
@@ -452,10 +575,10 @@ const QuestionsPage = () => {
               </p>
             </div>
           </AdminPanel>
-        ) : filteredQuestions.length === 0 ? (
+        ) : filteredQuestions.length === 0 && questions.length === 0 ? (
           <AdminEmptyState
-            title="No questions match the current filters"
-            description="Clear the active filters or create a fresh question through the new builder."
+            title="No questions in the database"
+            description="Start by uploading questions or creating new ones."
             icon={<Filter className="h-6 w-6" />}
             action={
               <HoloButton
@@ -464,121 +587,154 @@ const QuestionsPage = () => {
                 icon={<Plus size={16} />}
                 onClick={() => navigate('/admin/upload')}
               >
-                Launch Builder
+                Upload Questions
+              </HoloButton>
+            }
+          />
+        ) : filteredQuestions.length === 0 ? (
+          <AdminEmptyState
+            title="No questions match the current filters"
+            description="Clear the active filters or create more questions."
+            icon={<Filter className="h-6 w-6" />}
+            action={
+              <HoloButton
+                variant="cyan"
+                size="md"
+                icon={<Plus size={16} />}
+                onClick={clearFilters}
+              >
+                Clear Filters
               </HoloButton>
             }
           />
         ) : (
-          <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-            {filteredQuestions.map((question) => (
-              <motion.article
-                key={question._id}
-                whileHover={{ y: -6, scale: 1.01 }}
-                transition={{ duration: 0.24 }}
-                className="admin-panel p-5"
-              >
-                <div className="relative z-[1] space-y-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <AdminStatusBadge tone="cyan">{question.topic}</AdminStatusBadge>
-                        {question.subtopic ? (
-                          <AdminStatusBadge tone="default">{question.subtopic}</AdminStatusBadge>
-                        ) : null}
-                        <AdminStatusBadge tone={DIFFICULTY_TONE[question.difficulty]}>
-                          {question.difficulty}
-                        </AdminStatusBadge>
+          <div>
+            <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+              {filteredQuestions.map((question) => (
+                <motion.article
+                  key={question._id}
+                  whileHover={{ y: -6, scale: 1.01 }}
+                  transition={{ duration: 0.24 }}
+                  className="admin-panel p-5"
+                >
+                  <div className="relative z-[1] space-y-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <AdminStatusBadge tone="cyan">{question.topic}</AdminStatusBadge>
+                          {question.subtopic ? (
+                            <AdminStatusBadge tone="default">{question.subtopic}</AdminStatusBadge>
+                          ) : null}
+                          <AdminStatusBadge tone={DIFFICULTY_TONE[question.difficulty]}>
+                            {question.difficulty}
+                          </AdminStatusBadge>
+                        </div>
+                        <p className="text-sm leading-7 text-white/88">
+                          {question.questionText || 'Image-led question'}
+                        </p>
                       </div>
-                      <p className="text-sm leading-7 text-white/88">
-                        {question.questionText || 'Image-led question'}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setPreviewQuestion(question)}
-                        className="grid h-11 w-11 place-items-center rounded-2xl border border-white/10 bg-white/[0.04] text-white/72 transition-all hover:border-neon-cyan/24 hover:text-neon-cyan"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditError('');
-                          setEditState(buildEditState(question));
-                        }}
-                        className="grid h-11 w-11 place-items-center rounded-2xl border border-white/10 bg-white/[0.04] text-white/72 transition-all hover:border-neon-magenta/24 hover:text-neon-magenta"
-                      >
-                        <SquarePen className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(question._id)}
-                        disabled={busyId === question._id}
-                        className="grid h-11 w-11 place-items-center rounded-2xl border border-neon-red/20 bg-neon-red/10 text-neon-red transition-all hover:shadow-[0_0_24px_rgba(255,51,102,0.2)] disabled:opacity-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {question.questionImage ? (
-                    <img
-                      src={getAssetUrl(question.questionImage)}
-                      alt="Question"
-                      className="h-44 w-full rounded-[22px] border border-white/8 object-contain"
-                    />
-                  ) : null}
-
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {question.options.map((option, index) => {
-                      const optionLetter = getOptionLetter(index);
-                      const isCorrect = optionLetter === question.correctAnswer;
-                      return (
-                        <div
-                          key={`${question._id}-${optionLetter}`}
-                          className={`rounded-[20px] border p-3 ${
-                            isCorrect
-                              ? 'border-neon-green/22 bg-neon-green/8'
-                              : 'border-white/8 bg-white/[0.03]'
-                          }`}
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setPreviewQuestion(question)}
+                          className="grid h-11 w-11 place-items-center rounded-2xl border border-white/10 bg-white/[0.04] text-white/72 transition-all hover:border-neon-cyan/24 hover:text-neon-cyan"
                         >
-                          <div className="flex items-start gap-3">
-                            <span className="font-orbitron text-xs tracking-[0.18em] text-white/40">
-                              {optionLetter}
-                            </span>
-                            <div className="flex-1 space-y-2">
-                              {option.text ? (
-                                <p className="text-sm leading-6 text-white/78">{option.text}</p>
-                              ) : null}
-                              {option.image ? (
-                                <div className="flex items-center gap-2 rounded-2xl border border-white/8 bg-black/15 p-2">
-                                  <ImageIcon className="h-4 w-4 text-neon-cyan" />
-                                  <img
-                                    src={getAssetUrl(option.image)}
-                                    alt={`Option ${optionLetter}`}
-                                    className="h-16 max-w-[120px] rounded-xl object-contain"
-                                  />
-                                </div>
-                              ) : null}
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditError('');
+                            setEditState(buildEditState(question));
+                          }}
+                          className="grid h-11 w-11 place-items-center rounded-2xl border border-white/10 bg-white/[0.04] text-white/72 transition-all hover:border-neon-magenta/24 hover:text-neon-magenta"
+                        >
+                          <SquarePen className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(question._id)}
+                          disabled={busyId === question._id}
+                          className="grid h-11 w-11 place-items-center rounded-2xl border border-neon-red/20 bg-neon-red/10 text-neon-red transition-all hover:shadow-[0_0_24px_rgba(255,51,102,0.2)] disabled:opacity-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {question.questionImage ? (
+                      <img
+                        src={getAssetUrl(question.questionImage)}
+                        alt="Question"
+                        className="h-44 w-full rounded-[22px] border border-white/8 object-contain"
+                      />
+                    ) : null}
+
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {question.options.map((option, index) => {
+                        const optionLetter = getOptionLetter(index);
+                        const isCorrect = optionLetter === question.correctAnswer;
+                        return (
+                          <div
+                            key={`${question._id}-${optionLetter}`}
+                            className={`rounded-[20px] border p-3 ${
+                              isCorrect
+                                ? 'border-neon-green/22 bg-neon-green/8'
+                                : 'border-white/8 bg-white/[0.03]'
+                            }`}
+                          >
+                            <div className="flex items-start gap-3">
+                              <span className="font-orbitron text-xs tracking-[0.18em] text-white/40">
+                                {optionLetter}
+                              </span>
+                              <div className="flex-1 space-y-2">
+                                {option.text ? (
+                                  <p className="text-sm leading-6 text-white/78">{option.text}</p>
+                                ) : null}
+                                {option.image ? (
+                                  <div className="flex items-center gap-2 rounded-2xl border border-white/8 bg-black/15 p-2">
+                                    <ImageIcon className="h-4 w-4 text-neon-cyan" />
+                                    <img
+                                      src={getAssetUrl(option.image)}
+                                      alt={`Option ${optionLetter}`}
+                                      className="h-16 max-w-[120px] rounded-xl object-contain"
+                                    />
+                                  </div>
+                                ) : null}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {question.explanation ? (
-                    <div className="rounded-[20px] border border-neon-cyan/14 bg-neon-cyan/6 px-4 py-3">
-                      <p className="text-[11px] uppercase tracking-[0.28em] text-neon-cyan/75">
-                        Explanation
-                      </p>
-                      <p className="mt-2 text-sm leading-6 text-white/56">{question.explanation}</p>
+                        );
+                      })}
                     </div>
-                  ) : null}
-                </div>
-              </motion.article>
-            ))}
+
+                    {question.explanation ? (
+                      <div className="rounded-[20px] border border-neon-cyan/14 bg-neon-cyan/6 px-4 py-3">
+                        <p className="text-[11px] uppercase tracking-[0.28em] text-neon-cyan/75">
+                          Explanation
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-white/56">{question.explanation}</p>
+                      </div>
+                    ) : null}
+                  </div>
+                </motion.article>
+              ))}
+            </div>
+
+            {currentPage < totalPages && (
+              <div className="mt-8 flex flex-col items-center gap-4">
+                {isLoading && (
+                  <>
+                    <div className="h-10 w-10 rounded-full border-2 border-neon-cyan/30 border-t-neon-cyan animate-spin" />
+                    <p className="font-orbitron text-xs uppercase tracking-[0.24em] text-neon-cyan/80">
+                      Loading more questions
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+
+            <div ref={observerTarget} className="h-4" />
           </div>
         )}
 

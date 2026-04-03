@@ -54,15 +54,17 @@ export const deleteUserApi = async (userId: string) => {
 
 export const getQuestionsAdminApi = async (
   page = 1,
-  limit = 10,
+  limit = 50,
   topic = '',
-  difficulty = ''
+  difficulty = '',
+  questionType = ''
 ) => {
   const params = new URLSearchParams({
     page: String(page),
     limit: String(limit),
     ...(topic && { topic }),
     ...(difficulty && { difficulty }),
+    ...(questionType && { questionType }),
   });
   const response = await apiClient.get(`/questions?${params}`);
   return response.data;
@@ -162,4 +164,24 @@ export const downloadBulkTemplateApi = async () => {
     responseType: 'blob',
   });
   return response.data as Blob;
+};
+
+export const getAllTopicsApi = async () => {
+  const response = await apiClient.get('/questions/metadata/topics');
+  return response.data;
+};
+
+export const getSubtopicsForTopicApi = async (topic: string) => {
+  const params = new URLSearchParams({ topic });
+  const response = await apiClient.get(`/questions/metadata/subtopics?${params}`);
+  return response.data;
+};
+
+export const getQuestionMetadataApi = async (topic?: string) => {
+  const params = new URLSearchParams();
+  if (topic) {
+    params.append('topic', topic);
+  }
+  const response = await apiClient.get(`/questions/metadata/all?${params}`);
+  return response.data;
 };
