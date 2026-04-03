@@ -282,11 +282,24 @@ export const downloadBulkTemplate = asyncHandler(async (_req: Request, res: Resp
 });
 
 export const getAllQuestions = asyncHandler(async (req: Request, res: Response) => {
-  const { page, limit } = req.query;
-  const filter = buildQuestionFilter(req.query);
+  const { page, limit, questionType } = req.query;
+  const filter: any = buildQuestionFilter(req.query);
+
+  // Add question type filter if provided
+  if (questionType === 'text-only') {
+    // Questions with no images
+    filter.questionImage = { $in: [null, undefined, ''] };
+    filter['options.image'] = { $in: [null, undefined, ''] };
+  } else if (questionType === 'image-rich') {
+    // Questions with at least one image
+    filter.$or = [
+      { questionImage: { $exists: true, $ne: '' } },
+      { 'options.image': { $exists: true, $ne: '' } },
+    ];
+  }
 
   const pageNumber = Math.max(1, parseInt(page as string, 10) || 1);
-  const limitNumber = Math.min(100, parseInt(limit as string, 10) || 10);
+  const limitNumber = Math.min(500, parseInt(limit as string, 10) || 50);
   const skip = (pageNumber - 1) * limitNumber;
 
   const [questions, totalCount] = await Promise.all([
@@ -429,6 +442,95 @@ export const bulkDeleteQuestions = asyncHandler(async (req: Request, res: Respon
         subtopic: filter.subtopic || null,
         difficulty: filter.difficulty || null,
       },
+    })
+  );
+});
+
+export const getAllTopics = asyncHandler(async (_req: Request, res: Response) => {
+  const topics = await Question.find()
+    .select('topic')
+    .distinct('topic')
+    .lean();
+
+  const sortedTopics = (topics || [])
+    .filter((topic) => topic && typeof topic === 'string' && topic.trim())
+    .map((topic) => topic.trim())
+    .sort();
+
+  res.status(200).json(
+    successResponse('Topics fetched successfully.', {
+      topics: sortedTopics,
+      count: sortedTopics.length,
+    })
+  );
+});
+
+export const getSubtopicsForTopic = asyncHandler(async (req: Request, res: Response) => {
+  const { topic } = req.query;
+  const normalizedTopic = normalizeOptionalString(topic);
+
+  if (!normalizedTopic) {
+    res.status(400).json(errorResponse('Topic parameter is required.'));
+    return;
+  }
+
+  const subtopics = await Question.find({ topic: normalizedTopic })
+    .select('subtopic')
+    .distinct('subtopic')
+    .lean();
+
+  const sortedSubtopics = (subtopics || [])
+    .filter((subtopic) => subtopic && typeof subtopic === 'string' && subtopic.trim())
+    .map((subtopic) => subtopic.trim())
+    .sort();
+
+  res.status(200).json(
+    successResponse('Subtopics fetched successfully.', {
+      topic: normalizedTopic,
+      subtopics: sortedSubtopics,
+      count: sortedSubtopics.length,
+    })
+  );
+});
+
+export const getQuestionMetadata = asyncHandler(async (req: Request, res: Response) => {
+  const { topic } = req.query;
+  const normalizedTopic = normalizeOptionalString(topic);
+
+  const filter: Record<string, string | Record<string, any>> = {};
+  if (normalizedTopic) {
+    filter.topic = normalizedTopic;
+  }
+
+  const [topics, difficulties, totalCount, imageRichCount] = await Promise.all([
+    Question.find(filter).select('topic').distinct('topic').lean(),
+    Question.find(filter).select('difficulty').distinct('difficulty').lean(),
+    Question.countDocuments(filter),
+    Question.countDocuments({
+      ...filter,
+      $or: [
+        { questionImage: { $exists: true, $ne: '' } },
+        { 'options.image': { $exists: true, $ne: '' } },
+      ],
+    } as any),
+  ]);
+
+  const sortedTopics = (topics || [])
+    .filter((t) => t && typeof t === 'string' && t.trim())
+    .map((t) => t.trim())
+    .sort();
+
+  const sortedDifficulties = (difficulties || [])
+    .filter((d) => d && ['easy', 'medium', 'hard'].includes(d))
+    .sort();
+
+  res.status(200).json(
+    successResponse('Question metadata fetched successfully.', {
+      topics: sortedTopics,
+      difficulties: sortedDifficulties,
+      totalQuestions: totalCount,
+      imageRichQuestions: imageRichCount,
+      textOnlyQuestions: totalCount - imageRichCount,
     })
   );
 });
