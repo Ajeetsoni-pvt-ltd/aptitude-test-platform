@@ -1,14 +1,14 @@
 // src/pages/TestSetupPage.tsx
-// Futuristic multi-step test configuration wizard with StartTestModal
+// Futuristic multi-step test configuration wizard with Subtopic Selection
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { startTestApi } from '@/api/testApi';
+import { startTestApi, getSubtopicsApi } from '@/api/testApi';
 import AppLayout from '@/components/layout/AppLayout';
 import NeonCard from '@/components/ui/NeonCard';
 import HoloButton from '@/components/ui/HoloButton';
 import StartTestModal, { type StartTestConfig } from '@/components/ui/StartTestModal';
-import { ChevronRight, ChevronLeft, Zap, Brain, Hash, Clock, AlertTriangle, Check } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Zap, Brain, Hash, Clock, AlertTriangle, Check, Layers } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // ── Data ─────────────────────────────────────────────────────────
@@ -51,19 +51,69 @@ const StepDot = ({ step, current, label }: { step: number; current: number; labe
 // ── Main component ────────────────────────────────────────────────
 const TestSetupPage = () => {
   const navigate = useNavigate();
-  const [step,     setStep]     = useState(1);
-  const [topic,    setTopic]    = useState('');
-  const [diff,     setDiff]     = useState('all');
-  const [count,    setCount]    = useState(10);
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState('');
-  const [showModal, setShowModal] = useState(false);
+  const [step,       setStep]       = useState(1);
+  const [topic,      setTopic]      = useState('');
+  const [subtopics,  setSubtopics]  = useState<string[]>([]);
+  const [selectedSubtopics, setSelectedSubtopics] = useState<string[]>([]);
+  const [subtopicsLoading, setSubtopicsLoading] = useState(false);
+  const [subtopicsError, setSubtopicsError] = useState('');
+  const [diff,       setDiff]       = useState('all');
+  const [count,      setCount]      = useState(10);
+  const [loading,    setLoading]    = useState(false);
+  const [error,      setError]      = useState('');
+  const [showModal,  setShowModal]  = useState(false);
 
-  const timeMin     = count * 2;
+  const timeMin = count * 2;
+
+  // Fetch subtopics when topic changes
+  useEffect(() => {
+    if (!topic) {
+      setSubtopics([]);
+      setSelectedSubtopics([]);
+      return;
+    }
+
+    const fetchSubtopics = async () => {
+      setSubtopicsLoading(true);
+      setSubtopicsError('');
+      try {
+        const res = await getSubtopicsApi(topic);
+        if (res.success && res.data) {
+          setSubtopics(res.data.subtopics);
+          setSelectedSubtopics([]); // Reset selection when topic changes
+        }
+      } catch (err: unknown) {
+        const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message 
+          || 'Failed to fetch subtopics. Try again.';
+        setSubtopicsError(msg);
+        setSubtopics([]);
+      } finally {
+        setSubtopicsLoading(false);
+      }
+    };
+
+    fetchSubtopics();
+  }, [topic]);
+
+  // Toggle subtopic selection
+  const toggleSubtopic = (subtopic: string) => {
+    setSelectedSubtopics(prev => 
+      prev.includes(subtopic)
+        ? prev.filter(s => s !== subtopic)
+        : [...prev, subtopic]
+    );
+  };
 
   // Called when user clicks "Start Now" inside the modal
   const handleLaunch = async (config: StartTestConfig) => {
     if (!topic) { setError('Please select a topic first.'); return; }
+    
+    // Validate subtopics if they exist
+    if (subtopics.length > 0 && selectedSubtopics.length === 0) {
+      setError('Please select at least one subtopic.');
+      return;
+    }
+
     setError('');
     setLoading(true);
 
@@ -75,7 +125,8 @@ const TestSetupPage = () => {
         topic,
         difficulty: diff === 'all' ? undefined : diff,
         count: questionCount,
-        title: `${topic} — ${diff === 'all' ? 'Mixed' : diff.charAt(0).toUpperCase() + diff.slice(1)} (${questionCount}Q)`,
+        title: `${topic}${selectedSubtopics.length > 0 ? ' — ' + selectedSubtopics.join(', ') : ''} — ${diff === 'all' ? 'Mixed' : diff.charAt(0).toUpperCase() + diff.slice(1)} (${questionCount}Q)`,
+        subtopics: selectedSubtopics.length > 0 ? selectedSubtopics : undefined,
       });
       if (res.success && res.data) {
         setShowModal(false);
@@ -108,13 +159,15 @@ const TestSetupPage = () => {
         </div>
       </div>
 
-      {/* Step indicator */}
-      <div className="flex items-center gap-3 mb-8 animate-fade-up">
+      {/* Step indicator - Updated to show 4 steps */}
+      <div className="flex items-center gap-2 mb-8 animate-fade-up text-sm">
         <StepDot step={1} current={step} label="Topic" />
         <div className="flex-1 h-px bg-gradient-to-r from-neon-cyan/30 via-white/10 to-neon-violet/30" />
-        <StepDot step={2} current={step} label="Config" />
+        <StepDot step={2} current={step} label="Subtopic" />
         <div className="flex-1 h-px bg-gradient-to-r from-neon-violet/30 via-white/10 to-neon-cyan/30" />
-        <StepDot step={3} current={step} label="Launch" />
+        <StepDot step={3} current={step} label="Config" />
+        <div className="flex-1 h-px bg-gradient-to-r from-neon-cyan/30 via-white/10 to-neon-violet/30" />
+        <StepDot step={4} current={step} label="Launch" />
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
@@ -182,8 +235,118 @@ const TestSetupPage = () => {
             </NeonCard>
           )}
 
-          {/* STEP 2: Config */}
+          {/* STEP 2: Subtopic Selection */}
           {step === 2 && (
+            <NeonCard variant="magenta" className="animate-fade-up" padding="p-6">
+              <h2 className="font-inter font-semibold text-white mb-1 flex items-center gap-2">
+                <Layers size={18} className="text-neon-magenta" />
+                Select Subtopics
+              </h2>
+              <p className="text-white/30 text-sm mb-5 font-inter">Choose one or more subtopics to customize your test</p>
+
+              {subtopicsLoading && (
+                <div className="text-center py-8">
+                  <div className="inline-block">
+                    <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-neon-magenta"></div>
+                  </div>
+                  <p className="text-white/40 text-sm mt-3 font-inter">Loading subtopics...</p>
+                </div>
+              )}
+
+              {!subtopicsLoading && subtopics.length === 0 && !subtopicsError && (
+                <div className="p-4 rounded-xl bg-neon-cyan/5 border border-neon-cyan/25">
+                  <p className="text-neon-cyan text-sm font-inter">
+                    ✨ No specific subtopics found. Questions will be selected from the entire "{topic}" topic.
+                  </p>
+                </div>
+              )}
+
+              {subtopicsError && (
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-neon-red/8 border border-neon-red/25 animate-fade-in mb-4">
+                  <AlertTriangle size={14} className="text-neon-red" />
+                  <p className="text-neon-red text-sm font-inter">{subtopicsError}</p>
+                </div>
+              )}
+
+              {!subtopicsLoading && subtopics.length > 0 && (
+                <div>
+                  <p className="text-white/40 text-xs uppercase tracking-widest mb-3 font-inter">Available Subtopics ({subtopics.length})</p>
+                  <div className="space-y-2 mb-4">
+                    {subtopics.map((subtopic) => (
+                      <button
+                        key={subtopic}
+                        onClick={() => toggleSubtopic(subtopic)}
+                        className={cn(
+                          'w-full flex items-center gap-3 p-3 rounded-lg border transition-all duration-200 text-left',
+                          selectedSubtopics.includes(subtopic)
+                            ? 'border-neon-magenta/60 bg-neon-magenta/10 shadow-[0_0_15px_rgba(255,0,170,0.15)]'
+                            : 'border-white/8 hover:border-white/20 bg-white/[0.02]'
+                        )}
+                      >
+                        <div className={cn(
+                          'w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all',
+                          selectedSubtopics.includes(subtopic)
+                            ? 'border-neon-magenta bg-neon-magenta/30'
+                            : 'border-white/20 bg-transparent'
+                        )}>
+                          {selectedSubtopics.includes(subtopic) && (
+                            <Check size={12} className="text-neon-magenta" />
+                          )}
+                        </div>
+                        <span className={cn(
+                          'text-sm font-inter transition-colors',
+                          selectedSubtopics.includes(subtopic)
+                            ? 'text-neon-magenta font-semibold'
+                            : 'text-white/70 group-hover:text-white/90'
+                        )}>
+                          {subtopic}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {selectedSubtopics.length > 0 && (
+                    <div className="p-3 rounded-lg bg-neon-magenta/5 border border-neon-magenta/20 mb-4">
+                      <p className="text-white/70 text-xs font-inter mb-2">
+                        <span className="text-neon-magenta font-semibold">{selectedSubtopics.length}</span> subtopic{selectedSubtopics.length !== 1 ? 's' : ''} selected
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedSubtopics.map((s) => (
+                          <span key={s} className="inline-block px-2 py-1 text-xs rounded-full bg-neon-magenta/20 text-neon-magenta border border-neon-magenta/30">
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex justify-between mt-6">
+                <HoloButton variant="ghost" size="md" onClick={() => { setStep(1); setSubtopicsError(''); }} icon={<ChevronLeft size={16} />}>
+                  Back
+                </HoloButton>
+                <HoloButton 
+                  variant="magenta" 
+                  size="md" 
+                  onClick={() => { 
+                    if (subtopics.length > 0 && selectedSubtopics.length === 0) {
+                      setSubtopicsError('Please select at least one subtopic.');
+                      return;
+                    }
+                    setStep(3); 
+                    setSubtopicsError('');
+                  }} 
+                  icon={<ChevronRight size={16} />}
+                >
+                  Continue
+                </HoloButton>
+              </div>
+            </NeonCard>
+          )}
+
+          {/* STEP 3: Config */}
+          {step === 3 && (
             <NeonCard variant="violet" className="animate-fade-up" padding="p-6">
               <h2 className="font-inter font-semibold text-white mb-1 flex items-center gap-2">
                 <Zap size={18} className="text-neon-violet" />
@@ -217,7 +380,7 @@ const TestSetupPage = () => {
               {/* Default question count */}
               <div className="mb-6">
                 <p className="text-white/40 text-xs uppercase tracking-widest mb-3 font-inter flex items-center gap-2">
-                  <Hash size={12} /> Default Questions (can customise at launch)
+                  <Hash size={12} /> Default Questions
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {QUESTION_COUNTS.map((n) => (
@@ -241,45 +404,61 @@ const TestSetupPage = () => {
               </div>
 
               <div className="flex justify-between">
-                <HoloButton variant="ghost" size="md" onClick={() => setStep(1)} icon={<ChevronLeft size={16} />}>
+                <HoloButton variant="ghost" size="md" onClick={() => setStep(2)} icon={<ChevronLeft size={16} />}>
                   Back
                 </HoloButton>
-                <HoloButton variant="violet" size="md" onClick={() => setStep(3)} icon={<ChevronRight size={16} />}>
+                <HoloButton variant="violet" size="md" onClick={() => setStep(4)} icon={<ChevronRight size={16} />}>
                   Preview
                 </HoloButton>
               </div>
             </NeonCard>
           )}
 
-          {/* STEP 3: Confirm & Launch Modal */}
-          {step === 3 && (
-            <NeonCard variant="magenta" className="animate-fade-up" padding="p-6">
+          {/* STEP 4: Confirm & Launch Modal */}
+          {step === 4 && (
+            <NeonCard variant="cyan" className="animate-fade-up" padding="p-6">
               <h2 className="font-inter font-semibold text-white mb-1 flex items-center gap-2">
-                <Zap size={18} className="text-neon-magenta" />
+                <Zap size={18} className="text-neon-cyan" />
                 Ready to Launch
               </h2>
               <p className="text-white/30 text-sm mb-6 font-inter">Choose your environment and customize last details</p>
 
               {/* Summary cards */}
-              <div className="grid grid-cols-3 gap-3 mb-6">
-                {[
-                  { label: 'Domain',     value: topic.split(' ')[0], color: 'text-neon-cyan' },
-                  { label: 'Difficulty', value: diff === 'all' ? 'Mixed' : diff, color: 'text-neon-violet' },
-                  { label: 'Default Q', value: `${count}`, color: 'text-neon-green' },
-                ].map(item => (
-                  <div key={item.label} className="text-center p-3 rounded-xl bg-white/[0.025] border border-white/5">
-                    <p className={cn('font-orbitron font-bold text-lg', item.color)}>{item.value}</p>
-                    <p className="text-white/25 text-[10px] font-inter mt-0.5 uppercase tracking-wider">{item.label}</p>
+              <div className="grid gap-3 mb-6">
+                <div className="p-3 rounded-xl bg-white/[0.025] border border-white/5">
+                  <p className="text-white/30 text-xs font-inter mb-1">Domain</p>
+                  <p className="font-orbitron font-bold text-lg text-neon-cyan">{topic}</p>
+                </div>
+                {selectedSubtopics.length > 0 && (
+                  <div className="p-3 rounded-xl bg-white/[0.025] border border-white/5">
+                    <p className="text-white/30 text-xs font-inter mb-2">Subtopics ({selectedSubtopics.length})</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedSubtopics.map((s) => (
+                        <span key={s} className="inline-block px-2 py-1 text-xs rounded-full bg-neon-magenta/20 text-neon-magenta border border-neon-magenta/30">
+                          {s}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                ))}
+                )}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 rounded-xl bg-white/[0.025] border border-white/5">
+                    <p className="text-white/30 text-xs font-inter mb-1">Difficulty</p>
+                    <p className="font-orbitron font-bold text-lg text-neon-violet">{diff === 'all' ? 'Mixed' : diff}</p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-white/[0.025] border border-white/5">
+                    <p className="text-white/30 text-xs font-inter mb-1">Default Q</p>
+                    <p className="font-orbitron font-bold text-lg text-neon-green">{count}</p>
+                  </div>
+                </div>
               </div>
 
-              <div className="p-4 rounded-xl bg-neon-magenta/5 border border-neon-magenta/15 mb-5">
-                <p className="text-neon-magenta text-xs font-semibold mb-2 flex items-center gap-1.5">
-                  <Zap size={12} /> Launch Dialog
+              <div className="p-4 rounded-xl bg-neon-cyan/5 border border-neon-cyan/15 mb-5">
+                <p className="text-neon-cyan text-xs font-semibold mb-2 flex items-center gap-1.5">
+                  <Zap size={12} /> Final Configuration
                 </p>
                 <p className="text-white/35 text-xs font-inter">
-                  Clicking "Configure & Launch" opens the test configuration dialog where you can set the exact number of questions (5–100), time limit, and choose between proctored or normal mode.
+                  Clicking "Configure & Launch" opens the test configuration dialog where you can set the exact number of questions, time limit, and choose between proctored or normal mode.
                 </p>
               </div>
 
@@ -291,10 +470,10 @@ const TestSetupPage = () => {
               )}
 
               <div className="flex justify-between">
-                <HoloButton variant="ghost" size="md" onClick={() => setStep(2)} icon={<ChevronLeft size={16} />}>
+                <HoloButton variant="ghost" size="md" onClick={() => setStep(3)} icon={<ChevronLeft size={16} />}>
                   Back
                 </HoloButton>
-                <HoloButton variant="magenta" size="md" onClick={() => setShowModal(true)} icon={<ChevronRight size={16} />}>
+                <HoloButton variant="cyan" size="md" onClick={() => setShowModal(true)} icon={<ChevronRight size={16} />}>
                   Configure & Launch
                 </HoloButton>
               </div>
@@ -302,21 +481,22 @@ const TestSetupPage = () => {
           )}
         </div>
 
-        {/* ── Right: Live Preview ────────────────────────────── */}
+        {/* ── Right: Live Preview ────────────────────────────– */}
         <NeonCard variant="default" padding="p-5" className="h-fit animate-fade-up-delay">
           <p className="text-white/30 text-xs uppercase tracking-widest mb-4 font-inter">Configuration Preview</p>
 
           <div className="space-y-4">
             {[
-              { label: 'Domain',     value: topic    || '—',                       color: 'neon-cyan' },
+              { label: 'Domain', value: topic || '—', color: 'neon-cyan' },
+              selectedSubtopics.length > 0 ? { label: 'Subtopics', value: `${selectedSubtopics.length} selected`, color: 'neon-magenta' } : null,
               { label: 'Difficulty', value: diff === 'all' ? 'Mixed' : diff.charAt(0).toUpperCase() + diff.slice(1), color: 'neon-violet' },
-              { label: 'Questions',  value: `${count} Q`,                          color: 'neon-green' },
-              { label: 'Est. Time',  value: `${timeMin} min`,                      color: 'neon-amber' },
-            ].map((item) => (
-              <div key={item.label} className="flex items-center justify-between p-3 rounded-lg bg-white/[0.025] border border-white/5">
-                <span className="text-white/30 text-xs font-inter">{item.label}</span>
-                <span className={cn('text-xs font-mono-code font-semibold', `text-${item.color}`)}>
-                  {item.value}
+              { label: 'Questions', value: `${count} Q`, color: 'neon-green' },
+              { label: 'Est. Time', value: `${timeMin} min`, color: 'neon-amber' },
+            ].filter(Boolean).map((item) => (
+              <div key={item!.label} className="flex items-center justify-between p-3 rounded-lg bg-white/[0.025] border border-white/5">
+                <span className="text-white/30 text-xs font-inter">{item!.label}</span>
+                <span className={cn('text-xs font-mono-code font-semibold', `text-${item!.color}`)}>
+                  {item!.value}
                 </span>
               </div>
             ))}

@@ -1,11 +1,12 @@
 // src/pages/SettingsPage.tsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AppLayout from '@/components/layout/AppLayout';
 import NeonCard from '@/components/ui/NeonCard';
 import HoloButton from '@/components/ui/HoloButton';
 import CyberInput from '@/components/ui/CyberInput';
-import { Bell, Palette, Shield, Key, LogOut, Moon, Zap, Check } from 'lucide-react';
+import { Bell, Palette, Shield, Key, LogOut, Moon, Sun, Zap, Check } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
+import { useThemeStore } from '@/store/themeStore';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
@@ -40,6 +41,7 @@ const ACCENTS = [
 
 const SettingsPage = () => {
   const { logout, user } = useAuthStore();
+  const { theme, setTheme } = useThemeStore();
   const navigate         = useNavigate();
 
   const [notifications, setNotifications] = useState({
@@ -64,8 +66,33 @@ const SettingsPage = () => {
       label: 'Appearance',
       color: 'cyan',
       content: (
-        <div className="space-y-5">
+        <div className="space-y-6">
           <div>
+            <p className="text-white/40 text-xs uppercase tracking-widest mb-3 font-inter">Theme Preference</p>
+            <div className="flex gap-3">
+              {[
+                { value: 'light', label: 'Light Mode', icon: <Sun size={16} /> },
+                { value: 'dark', label: 'Dark Mode', icon: <Moon size={16} /> },
+              ].map((t) => (
+                <button
+                  key={t.value}
+                  onClick={() => setTheme(t.value as 'light' | 'dark')}
+                  className={cn(
+                    'flex flex-col items-center gap-2 px-4 py-3 rounded-xl border transition-all duration-300',
+                    theme === t.value
+                      ? 'border-neon-cyan/50 bg-neon-cyan/15 text-neon-cyan shadow-[0_0_15px_rgba(0,245,255,0.3)]'
+                      : 'border-white/15 bg-white/5 text-white/40 hover:border-white/30 hover:bg-white/10'
+                  )}
+                >
+                  {t.icon}
+                  <span className="text-sm font-inter">{t.label}</span>
+                  {theme === t.value && <Check size={13} />}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="border-t border-white/5 pt-6">
             <p className="text-white/40 text-xs uppercase tracking-widest mb-3 font-inter">Accent Color</p>
             <div className="flex gap-3">
               {ACCENTS.map((a) => (
@@ -84,12 +111,6 @@ const SettingsPage = () => {
                 </button>
               ))}
             </div>
-          </div>
-          <div className="flex items-center justify-between py-3 border-t border-white/5">
-            <div className="flex items-center gap-2 text-white/60 text-sm font-inter">
-              <Moon size={15} /> Dark mode (always on)
-            </div>
-            <span className="text-neon-green text-xs font-mono-code">ENABLED</span>
           </div>
         </div>
       ),

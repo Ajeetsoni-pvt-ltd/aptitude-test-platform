@@ -1,6 +1,16 @@
-// frontend/src/api/testApi.ts — Puri file replace karo
+// frontend/src/api/testApi.ts
 import apiClient from './axios';
 import type { ApiResponse, TestAttempt, Question } from '@/types';
+
+// ─── Get Subtopics ────────────────────────────────────────────
+export const getSubtopicsApi = async (topic: string): Promise<ApiResponse<{
+  topic: string;
+  subtopics: string[];
+  total: number;
+}>> => {
+  const response = await apiClient.get(`/tests/subtopics/${encodeURIComponent(topic)}`);
+  return response.data;
+};
 
 // ─── My Results ───────────────────────────────────────────────
 export const getMyResultsApi = async (page = 1, limit = 5) => {
@@ -16,6 +26,7 @@ export const startTestApi = async (data: {
   difficulty?: string;
   count: number;
   title?: string;
+  subtopics?: string[];
 }): Promise<ApiResponse<{
   attemptId: string;
   title: string;

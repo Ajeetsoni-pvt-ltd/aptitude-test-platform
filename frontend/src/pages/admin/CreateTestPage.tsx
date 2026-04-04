@@ -69,6 +69,7 @@ const CreateTestPage = () => {
   const [students, setStudents] = useState<StudentOption[]>([]);
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [search, setSearch] = useState('');
+  const [maxAttempts, setMaxAttempts] = useState(1);
   const [scheduledTests, setScheduledTests] = useState<ScheduledTestCard[]>([]);
   const [uploadResult, setUploadResult] = useState<BulkUploadResult | null>(null);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -233,7 +234,7 @@ const CreateTestPage = () => {
       formData.append('startTime', windowRange.start.toISOString());
       formData.append('endTime', windowRange.end.toISOString());
       formData.append('assignedStudents', JSON.stringify(selectedStudents));
-      formData.append('oneAttemptOnly', 'true');
+      formData.append('maxAttempts', String(maxAttempts));
       formData.append('file', workbook);
       if (imagesZip) formData.append('imagesZip', imagesZip);
 
@@ -263,6 +264,7 @@ const CreateTestPage = () => {
       );
       setTitle('');
       setTimeLimit(180);
+      setMaxAttempts(1);
       setStartDate('');
       setStartTime('');
       setEndDate('');
@@ -309,14 +311,26 @@ const CreateTestPage = () => {
                   placeholder="Test title"
                   className="cyber-input w-full px-4 py-3 text-sm"
                 />
-                <input
-                  type="number"
-                  min={1}
-                  value={timeLimit}
-                  onChange={(event) => setTimeLimit(Number(event.target.value))}
-                  className="cyber-input w-full px-4 py-3 text-sm"
-                  placeholder="Duration in minutes"
-                />
+                <div className="grid md:grid-cols-2 gap-4">
+                  <input
+                    type="number"
+                    min={1}
+                    max={999}
+                    value={timeLimit}
+                    onChange={(event) => setTimeLimit(Math.max(1, Number(event.target.value)))}
+                    className="cyber-input w-full px-4 py-3 text-sm"
+                    placeholder="Duration in minutes"
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    max={999}
+                    value={maxAttempts}
+                    onChange={(event) => setMaxAttempts(Math.max(1, Number(event.target.value)))}
+                    className="cyber-input w-full px-4 py-3 text-sm"
+                    placeholder="Max attempts per student"
+                  />
+                </div>
                 <div className="rounded-xl border border-neon-cyan/20 bg-neon-cyan/5 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                     <div>
@@ -513,8 +527,8 @@ const CreateTestPage = () => {
               <p className="text-white/30 text-xs uppercase tracking-widest mb-4">Rules</p>
               <div className="space-y-3 text-xs font-inter">
                 <div className="rounded-xl border border-white/8 bg-white/[0.02] p-3">
-                  <div className="flex items-center gap-2 text-white/80 font-semibold"><Lock size={13} className="text-neon-amber" />One attempt only</div>
-                  <p className="text-white/35 mt-1">Students cannot reattempt after submission or expiry.</p>
+                  <div className="flex items-center gap-2 text-white/80 font-semibold"><Lock size={13} className="text-neon-amber" />Attempt Limit Control</div>
+                  <p className="text-white/35 mt-1">Set the maximum number of attempts allowed per student. Default is 1 attempt.</p>
                 </div>
                 <div className="rounded-xl border border-white/8 bg-white/[0.02] p-3">
                   <div className="flex items-center gap-2 text-white/80 font-semibold"><Bell size={13} className="text-neon-cyan" />In-app notification</div>
@@ -534,6 +548,7 @@ const CreateTestPage = () => {
                   ['Title', title || '-'],
                   ['Workbook', workbook?.name || 'Not selected'],
                   ['Duration', `${timeLimit} min`],
+                  ['Max Attempts', `${maxAttempts} per student`],
                   ['Students', `${selectedStudents.length} assigned`],
                   ['Questions', uploadResult ? `${uploadResult.summary.validRows} ready` : 'Parsed on create'],
                 ].map(([label, value]) => (

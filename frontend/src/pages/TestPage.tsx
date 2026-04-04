@@ -8,6 +8,7 @@ import useFullscreen    from '@/hooks/useFullscreen';
 import useAntiCheat     from '@/hooks/useAntiCheat';
 import useFaceDetection from '@/hooks/useFaceDetection';
 import useTimer         from '@/hooks/useTimer';
+import { useThemeStore } from '@/store/themeStore';
 import { submitTestApi } from '@/api/testApi';
 import type { Question } from '@/types';
 import { cn } from '@/lib/utils';
@@ -17,7 +18,7 @@ import ProgressRing      from '@/components/ui/ProgressRing';
 import FaceTrackerOverlay from '@/components/ui/FaceTrackerOverlay';
 import {
   ChevronLeft, ChevronRight, Send, AlertTriangle, Zap,
-  Maximize, Minimize, Shield,
+  Maximize, Minimize, Shield, Moon, Sun,
 } from 'lucide-react';
 
 type AnswerMap = Record<string, string>;
@@ -207,6 +208,7 @@ const TestContent = ({
 }) => {
   const navigate = useNavigate();
   const { isFullscreen, enterFullscreen, exitFullscreen } = useFullscreen();
+  const { theme, toggleThemeTemporarily } = useThemeStore();
   const [started,    setStarted]    = useState(false);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers,    setAnswers]    = useState<AnswerMap>({});
@@ -389,6 +391,13 @@ const TestContent = ({
           <span className="text-white/30 text-xs font-mono-code hidden sm:block">
             {currentIdx + 1}/{questions.length}
           </span>
+          <button
+            onClick={toggleThemeTemporarily}
+            className="text-white/30 hover:text-white/60 transition-colors p-1 rounded-lg hover:bg-white/5"
+            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+          >
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
           {!isProctored && (
             <button
               onClick={isFullscreen ? exitFullscreen : enterFullscreen}

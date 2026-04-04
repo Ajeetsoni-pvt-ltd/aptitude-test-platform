@@ -58,7 +58,7 @@ const AppLayout = ({ children, className, fullScreen = false }: AppLayoutProps) 
 
       {/* ── Mobile Top Bar ───────────────────────────────── */}
       <header className={cn(
-        'lg:hidden fixed top-0 left-0 right-0 z-20 h-14 flex items-center px-4 gap-3',
+        'lg:hidden fixed top-0 left-0 right-0 z-20 h-14 flex items-center justify-between px-4 gap-3',
         'border-b transition-all duration-300',
         scrolled
           ? 'border-white/10 bg-cyber-black/90 backdrop-blur-xl'
