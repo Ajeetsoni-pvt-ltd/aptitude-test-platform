@@ -28,6 +28,7 @@ interface ScheduledTest {
   difficulty: string;
   questionCount: number;
   timeLimit: number;
+  maxAttempts?: number;
   startTime: string;
   endTime?: string;
   status: 'locked' | 'live' | 'completed';
@@ -309,6 +310,11 @@ const ManageTestsPage = () => {
                             <Clock className="w-3 h-3" /> Duration
                           </p>
                           <p className="text-white/80">{test.timeLimit} mins</p>
+                        </div>
+
+                        <div>
+                          <p className="text-white/40 text-xs">Max Attempts</p>
+                          <p className="text-white/80 font-bold">{test.maxAttempts || 1}</p>
                         </div>
 
                         <div>
