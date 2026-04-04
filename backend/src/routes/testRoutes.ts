@@ -9,6 +9,7 @@ import {
   submitTest,
   getMyResults,
   getAttemptById,
+  getSubtopics,
 } from '../controllers/testController';
 import { protect } from '../middlewares/authMiddleware';
 
@@ -16,6 +17,9 @@ const router = Router();
 
 // Sab test routes ke liye login zaroori hai → protect sab pe
 router.use(protect); // ← Ek baar lagao, sab routes pe apply hoga!
+
+// GET  /api/tests/subtopics/:topic   → Get subtopics for a topic
+router.get('/subtopics/:topic', getSubtopics);
 
 // POST /api/tests/start              → Naya test shuru karo
 router.post('/start', startTest);

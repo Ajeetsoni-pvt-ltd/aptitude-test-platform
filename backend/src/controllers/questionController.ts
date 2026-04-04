@@ -285,6 +285,9 @@ export const getAllQuestions = asyncHandler(async (req: Request, res: Response) 
   const { page, limit, questionType } = req.query;
   const filter: any = buildQuestionFilter(req.query);
 
+  // Exclude test-exclusive questions from public question bank
+  filter.isTestExclusive = { $ne: true };
+
   // Add question type filter if provided
   if (questionType === 'text-only') {
     // Questions with no images

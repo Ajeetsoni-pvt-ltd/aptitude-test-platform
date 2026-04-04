@@ -17,6 +17,7 @@ export interface IQuestion extends Document {
   options: IQuestionOption[];
   correctAnswer: CorrectAnswer;
   explanation?: string;
+  isTestExclusive?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -81,6 +82,11 @@ const questionSchema = new Schema<IQuestion>(
       type: String,
       trim: true,
       default: '',
+    },
+    isTestExclusive: {
+      type: Boolean,
+      default: false,
+      index: true,
     },
   },
   {

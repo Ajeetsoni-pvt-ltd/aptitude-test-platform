@@ -7,6 +7,7 @@ export interface IUser extends Document {
   email: string;
   password: string;         // yeh hashed hoga
   role: 'student' | 'admin';
+  profilePicture?: string;  // URL to profile picture
   createdAt: Date;
   updatedAt: Date;
 }
@@ -38,6 +39,10 @@ const userSchema = new Schema<IUser>(
       type: String,
       enum: ['student', 'admin'],
       default: 'student',
+    },
+    profilePicture: {
+      type: String,
+      default: undefined,
     },
   },
   {
