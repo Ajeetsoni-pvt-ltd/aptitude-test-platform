@@ -12,6 +12,7 @@ import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
 import authRoutes from './routes/authRoutes';
+import userRoutes from './routes/userRoutes';
 import questionRoutes from './routes/questionRoutes';
 import testRoutes from './routes/testRoutes';
 import adminRoutes from './routes/adminRoutes';
@@ -81,6 +82,7 @@ app.get('/health', (_req: Request, res: Response) => {
 
 // ─── API Routes ────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);                    // ✅ Auth
+app.use('/api/users', userRoutes);                   // ✅ User Profile & Stats
 app.use('/api/questions', questionRoutes);          // ✅ Questions
 app.use('/api/tests', testRoutes);                  // ✅ Tests
 app.use('/api/admin', adminRoutes);                 // ✅ Admin stats

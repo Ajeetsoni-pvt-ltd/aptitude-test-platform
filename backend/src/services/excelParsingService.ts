@@ -162,6 +162,7 @@ export async function parseExcelAndCreateQuestions(filePath: string): Promise<Ex
           options: question.options,
           correctAnswer: question.correctAnswer,
           explanation: question.explanation,
+          isTestExclusive: true,
         });
 
         result.questionIds.push(createdQuestion._id.toString());

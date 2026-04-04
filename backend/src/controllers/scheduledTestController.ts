@@ -151,7 +151,7 @@ export const createScheduledTest = async (req: Request, res: Response): Promise<
       timeLimit,
       startTime,
       endTime,
-      oneAttemptOnly: parseBoolean(req.body.oneAttemptOnly, true),
+      maxAttempts: parsePositiveNumber(req.body.maxAttempts, 1),
       sendNotification: true,
       assignedStudents,
       createdBy: new mongoose.Types.ObjectId(adminId),
@@ -290,17 +290,21 @@ export const startScheduledTest = async (req: Request, res: Response): Promise<v
       return;
     }
 
-    if (scheduledTest.oneAttemptOnly) {
-      const existingAttempt = await TestAttempt.findOne({
+    if (scheduledTest.maxAttempts < Infinity) {
+      const studentAttempts = await TestAttempt.countDocuments({
         user: new mongoose.Types.ObjectId(studentId),
         scheduledTest: new mongoose.Types.ObjectId(testId),
       });
 
-      if (existingAttempt) {
+      if (studentAttempts >= scheduledTest.maxAttempts) {
         res.status(409).json({
           success: false,
-          message: 'You have already attempted this test. Only one attempt is allowed per student.',
-          code: 'ATTEMPT_ALREADY_EXISTS',
+          message: `You have already attempted this test ${studentAttempts} time(s). Maximum ${scheduledTest.maxAttempts} attempt(s) allowed.`,
+          code: 'MAX_ATTEMPTS_REACHED',
+          data: {
+            maxAttempts: scheduledTest.maxAttempts,
+            currentAttempts: studentAttempts,
+          },
         });
         return;
       }

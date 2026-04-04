@@ -16,12 +16,40 @@ import { successResponse, errorResponse } from '../utils/ApiResponse';
 import { normalizeQuestions } from '../utils/normalizeQuestion';
 
 // ═══════════════════════════════════════════════════════════════
+// @desc    Get subtopics for a specific topic
+// @route   GET /api/tests/subtopics/:topic
+// @access  Private (login required)
+// ═══════════════════════════════════════════════════════════════
+export const getSubtopics = asyncHandler(async (req: Request, res: Response) => {
+  const { topic } = req.params;
+
+  if (!topic) {
+    res.status(400).json(errorResponse('Topic parameter is required.'));
+    return;
+  }
+
+  // Fetch unique subtopics for the given topic
+  const subtopics = await Question.distinct('subtopic', { 
+    topic: topic,
+    subtopic: { $nin: ['', null] } // Only non-empty subtopics
+  });
+
+  res.status(200).json(
+    successResponse('Subtopics fetched successfully.', {
+      topic,
+      subtopics: subtopics.sort() || [],
+      total: subtopics.length,
+    })
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════
 // @desc    Start a new test attempt
 // @route   POST /api/tests/start
 // @access  Private (login required)
 // ═══════════════════════════════════════════════════════════════
 export const startTest = asyncHandler(async (req: Request, res: Response) => {
-  const { topic, difficulty, count, title, testType } = req.body;
+  const { topic, difficulty, count, title, testType, subtopics } = req.body;
 
   // ─── Step 1: Validation ────────────────────────────────────
   if (!topic || !count) {
@@ -36,8 +64,13 @@ export const startTest = asyncHandler(async (req: Request, res: Response) => {
   }
 
   // ─── Step 2: Filter banao ──────────────────────────────────
-  const filter: Record<string, string> = { topic };
+  const filter: Record<string, any> = { topic };
   if (difficulty) filter.difficulty = difficulty;
+  
+  // Add subtopic filter if provided
+  if (subtopics && Array.isArray(subtopics) && subtopics.length > 0) {
+    filter.subtopic = { $in: subtopics };
+  }
 
   // ─── Step 3: DB mein kitne questions available hain? ───────
   const availableCount = await Question.countDocuments(filter);

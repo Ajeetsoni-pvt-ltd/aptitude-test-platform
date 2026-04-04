@@ -12,7 +12,7 @@ export interface IScheduledTest extends Document {
   timeLimit:      number;                      // in minutes
   startTime:      Date;
   endTime:        Date;                        // When test expires/becomes unavailable
-  oneAttemptOnly: boolean;                     // Only one attempt per student
+  maxAttempts:    number;                      // Maximum attempts per student (default: 1)
   sendNotification: boolean;                   // Send notification to students
   assignedStudents: mongoose.Types.ObjectId[];
   createdBy:      mongoose.Types.ObjectId;
@@ -75,9 +75,10 @@ const scheduledTestSchema = new Schema<IScheduledTest>(
       type:     Date,
       required: [true, 'End time is required'],
     },
-    oneAttemptOnly: {
-      type:    Boolean,
-      default: true,
+    maxAttempts: {
+      type:    Number,
+      min:     [1, 'Minimum 1 attempt is required'],
+      default: 1,
     },
     sendNotification: {
       type:    Boolean,
