@@ -173,20 +173,50 @@ export const createScheduledTest = async (req: Request, res: Response): Promise<
 
 export const getScheduledTests = async (_req: Request, res: Response): Promise<void> => {
   try {
+    console.log('[getScheduledTests] Fetching all scheduled tests...');
+    
     const tests = await ScheduledTest.find()
       .sort({ startTime: -1 })
-      .populate('assignedStudents', 'name email')
-      .populate('createdBy', 'name email');
+      .lean()
+      .exec();
 
-    const formatted = tests.map((test) => ({
-      ...test.toObject(),
-      status: computeStatus(test.startTime, test.endTime),
-    }));
+    console.log(`[getScheduledTests] Found ${tests.length} tests`);
 
+    const formatted = tests.map((test: any) => {
+      const startTime = new Date(test.startTime);
+      // If endTime is missing, calculate it from startTime + timeLimit
+      let endTime = test.endTime ? new Date(test.endTime) : new Date(startTime.getTime() + (test.timeLimit || 60) * 60_000);
+      
+      return {
+        _id: test._id,
+        title: test.title,
+        testCode: test.testCode,
+        topic: test.topic,
+        difficulty: test.difficulty,
+        questionCount: test.questionCount,
+        timeLimit: test.timeLimit,
+        startTime,
+        endTime,
+        maxAttempts: test.maxAttempts,
+        sendNotification: test.sendNotification,
+        assignedStudents: test.assignedStudents || [],
+        createdBy: test.createdBy,
+        customQuestions: test.customQuestions,
+        createdAt: test.createdAt,
+        updatedAt: test.updatedAt,
+        status: computeStatus(startTime, endTime),
+      };
+    });
+
+    console.log(`[getScheduledTests] Formatted ${formatted.length} tests`);
     res.status(200).json({ success: true, data: formatted, count: formatted.length });
   } catch (error) {
     const err = error as Error;
-    res.status(500).json({ success: false, message: err.message });
+    console.error('[getScheduledTests] Error:', err.message, err.stack);
+    res.status(500).json({ 
+      success: false, 
+      message: `Failed to fetch scheduled tests: ${err.message}` 
+    });
   }
 };
 
@@ -200,12 +230,35 @@ export const getMyScheduledTests = async (req: Request, res: Response): Promise<
 
     const tests = await ScheduledTest.find({
       assignedStudents: new mongoose.Types.ObjectId(studentId),
-    }).sort({ startTime: 1 });
+    })
+      .sort({ startTime: 1 })
+      .lean()
+      .exec();
 
-    const formatted = tests.map((test) => ({
-      ...test.toObject(),
-      status: computeStatus(test.startTime, test.endTime),
-    }));
+    const formatted = tests.map((test: any) => {
+      const startTime = new Date(test.startTime);
+      // If endTime is missing, calculate it from startTime + timeLimit
+      let endTime = test.endTime ? new Date(test.endTime) : new Date(startTime.getTime() + (test.timeLimit || 60) * 60_000);
+      
+      return {
+        _id: test._id,
+        title: test.title,
+        testCode: test.testCode,
+        topic: test.topic,
+        difficulty: test.difficulty,
+        questionCount: test.questionCount,
+        timeLimit: test.timeLimit,
+        startTime,
+        endTime,
+        maxAttempts: test.maxAttempts,
+        assignedStudents: test.assignedStudents || [],
+        createdBy: test.createdBy,
+        customQuestions: test.customQuestions,
+        createdAt: test.createdAt,
+        updatedAt: test.updatedAt,
+        status: computeStatus(startTime, endTime),
+      };
+    });
 
     res.status(200).json({ success: true, data: formatted });
   } catch (error) {
