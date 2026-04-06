@@ -1,7 +1,5 @@
 // backend/src/routes/adminRoutes.ts
-// ─────────────────────────────────────────────────────────────
-// Admin Routes — Sab ke liye protect + adminOnly middleware
-// ─────────────────────────────────────────────────────────────
+// Admin Routes — protect + adminOnly middleware
 
 import { Router } from 'express';
 import {
@@ -9,24 +7,32 @@ import {
   getAllUsers,
   updateUserRole,
   deleteUser,
+  getStudentAnalytics,
+  toggleUserStatus,
 } from '../controllers/adminController';
 import { protect, adminOnly } from '../middlewares/authMiddleware';
 
 const router = Router();
 
-// Sab admin routes → login + admin role required
+// All admin routes → login + admin role required
 router.use(protect, adminOnly);
 
-// GET  /api/admin/stats              → Platform stats
+// GET  /api/admin/stats
 router.get('/stats', getAdminStats);
 
-// GET  /api/admin/users              → All users list
+// GET  /api/admin/users
 router.get('/users', getAllUsers);
 
-// PATCH /api/admin/users/:userId/role → Role change
+// PATCH /api/admin/users/:userId/role
 router.patch('/users/:userId/role', updateUserRole);
 
-// DELETE /api/admin/users/:userId    → User delete
+// PATCH /api/admin/users/:userId/status (activate/deactivate)
+router.patch('/users/:userId/status', toggleUserStatus);
+
+// DELETE /api/admin/users/:userId
 router.delete('/users/:userId', deleteUser);
+
+// GET /api/admin/students/:userId/analytics
+router.get('/students/:userId/analytics', getStudentAnalytics);
 
 export default router;

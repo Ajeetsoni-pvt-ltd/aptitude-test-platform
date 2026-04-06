@@ -7,6 +7,12 @@ interface IAnswer {
   timeSpent: number;
 }
 
+export interface IViolation {
+  type: 'tab_switch' | 'face_missing' | 'multiple_faces' | 'fullscreen_exit' | 'screen_capture' | 'copy_paste' | 'other';
+  timestamp: Date;
+  details?: string;
+}
+
 export interface ITestAttempt extends Document {
   user: Types.ObjectId;
   testType: 'practice' | 'mock' | 'sectional' | 'full' | 'custom';
@@ -21,6 +27,8 @@ export interface ITestAttempt extends Document {
   totalTime: number;
   topicPerformance?: Map<string, { correct: number; total: number }>;
   scheduledTest?: Types.ObjectId;
+  proctoringEnabled: boolean;
+  violations: IViolation[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -75,6 +83,17 @@ const testAttemptSchema = new Schema<ITestAttempt>(
       ref: 'ScheduledTest',
       default: null,
     },
+    proctoringEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    violations: [
+      {
+        type:      { type: String, enum: ['tab_switch', 'face_missing', 'multiple_faces', 'fullscreen_exit', 'screen_capture', 'copy_paste', 'other'] },
+        timestamp: { type: Date, default: Date.now },
+        details:   { type: String },
+      },
+    ],
   },
   { timestamps: true }
 );

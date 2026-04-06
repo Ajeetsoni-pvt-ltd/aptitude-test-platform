@@ -18,6 +18,8 @@ import testRoutes from './routes/testRoutes';
 import adminRoutes from './routes/adminRoutes';
 import scheduledTestRoutes from './routes/scheduledTestRoutes';
 import notificationRoutes from './routes/notificationRoutes';
+import aiRoutes from './routes/aiRoutes';
+import proctoringRoutes from './routes/proctoringRoutes';
 const app: Application = express();
 
 // ─── Security Middleware ───────────────────────────────────────
@@ -88,6 +90,8 @@ app.use('/api/tests', testRoutes);                  // ✅ Tests
 app.use('/api/admin', adminRoutes);                 // ✅ Admin stats
 app.use('/api/scheduled-tests', scheduledTestRoutes); // ✅ Scheduled Tests
 app.use('/api/notifications', notificationRoutes);  // ✅ Notifications
+app.use('/api/ai', aiRoutes);                       // ✅ AI Assistant (Gemini)
+app.use('/api/proctoring', proctoringRoutes);       // ✅ Proctoring System
 
 
 // ─── 404 Handler ──────────────────────────────────────────────

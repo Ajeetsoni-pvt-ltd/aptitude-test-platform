@@ -5,9 +5,10 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface IUser extends Document {
   name: string;
   email: string;
-  password: string;         // yeh hashed hoga
+  password: string;
   role: 'student' | 'admin';
-  profilePicture?: string;  // URL to profile picture
+  profilePicture?: string;
+  isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -43,6 +44,10 @@ const userSchema = new Schema<IUser>(
     profilePicture: {
       type: String,
       default: undefined,
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
     },
   },
   {
