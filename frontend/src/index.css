@@ -50,6 +50,12 @@
   --glass-bg:     rgba(13, 13, 26, 0.7);
   --glass-border: rgba(255, 255, 255, 0.08);
   --glass-highlight: rgba(255, 255, 255, 0.05);
+
+  /* Watermark vars (dark mode) */
+  --watermark-text-color: #b3b3b3;
+  --watermark-text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+  --watermark-pattern-light: rgba(180, 180, 180, 0.025);
+  --watermark-pattern-dark: rgba(40, 40, 40, 0.02);
 }
 
 /* ─ Light Mode ─────────────────────────────────────────────────── */
@@ -88,6 +94,12 @@ html.light {
   --glass-bg:     rgba(255, 255, 255, 0.6);
   --glass-border: rgba(0, 0, 0, 0.1);
   --glass-highlight: rgba(255, 255, 255, 0.8);
+
+  /* Watermark vars (light mode) */
+  --watermark-text-color: #4a4a4a;
+  --watermark-text-shadow: 0 0 2px rgba(255, 255, 255, 0.6);
+  --watermark-pattern-light: rgba(100, 100, 100, 0.03);
+  --watermark-pattern-dark: rgba(200, 200, 200, 0.025);
 }
 
 /* ── Base Reset ───────────────────────────────────────────────── */
@@ -1483,4 +1495,213 @@ html.light {
     border-top-right-radius: 18px;
     border-bottom-right-radius: 18px;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   COMPREHENSIVE LIGHT MODE FIXES
+   ═══════════════════════════════════════════════════════════════ */
+@layer utilities {
+
+  /* ── Recharts / Chart text colors ─────────────────────────── */
+  html.light .recharts-cartesian-axis-tick text {
+    fill: rgba(50, 50, 70, 0.6) !important;
+  }
+  html.light .recharts-polar-angle-axis-tick text {
+    fill: rgba(50, 50, 70, 0.65) !important;
+  }
+  html.light .recharts-polar-grid-angle line,
+  html.light .recharts-polar-grid-concentric-polygon {
+    stroke: rgba(0, 0, 0, 0.08) !important;
+  }
+  html.light .recharts-tooltip-wrapper .recharts-default-tooltip {
+    background: rgba(255, 255, 255, 0.98) !important;
+    border: 1px solid rgba(0, 0, 0, 0.1) !important;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  }
+
+  /* ── AI Assistant Panel ────────────────────────────────────── */
+  html.light .glass-strong {
+    background: rgba(255, 255, 255, 0.97) !important;
+    border: 1px solid rgba(0, 0, 0, 0.1) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  }
+
+  /* AI chat messages */
+  html.light .bg-white\/5 {
+    background-color: rgba(0, 0, 0, 0.04) !important;
+  }
+  html.light .bg-neon-cyan\/10 {
+    background-color: rgba(0, 153, 255, 0.08) !important;
+  }
+
+  /* AI chat text */
+  html.light .text-white\/80 { color: rgba(30, 30, 50, 0.9) !important; }
+  html.light .text-white\/60 { color: rgba(50, 50, 70, 0.8) !important; }
+  html.light .text-white\/50 { color: rgba(60, 60, 80, 0.75) !important; }
+  html.light .text-white\/40 { color: rgba(70, 70, 90, 0.65) !important; }
+  html.light .text-white\/35 { color: rgba(80, 80, 100, 0.6) !important; }
+  html.light .text-white\/30 { color: rgba(90, 90, 110, 0.55) !important; }
+  html.light .text-white\/25 { color: rgba(100, 100, 120, 0.5) !important; }
+  html.light .text-white\/20 { color: rgba(110, 110, 130, 0.45) !important; }
+  html.light .text-white     { color: rgba(20, 20, 40, 0.95) !important; }
+  html.light .text-white\/90 { color: rgba(20, 20, 40, 0.95) !important; }
+  html.light .text-white\/85 { color: rgba(25, 25, 45, 0.92) !important; }
+  html.light .text-white\/70 { color: rgba(40, 40, 60, 0.85) !important; }
+
+  /* AI chat border */
+  html.light .border-white\/5  { border-color: rgba(0, 0, 0, 0.06) !important; }
+  html.light .border-white\/6  { border-color: rgba(0, 0, 0, 0.07) !important; }
+  html.light .border-white\/8  { border-color: rgba(0, 0, 0, 0.08) !important; }
+  html.light .border-white\/10 { border-color: rgba(0, 0, 0, 0.1) !important; }
+  html.light .border-white\/12 { border-color: rgba(0, 0, 0, 0.12) !important; }
+  html.light .border-white\/15 { border-color: rgba(0, 0, 0, 0.15) !important; }
+  html.light .border-white\/20 { border-color: rgba(0, 0, 0, 0.18) !important; }
+  html.light .border-white\/25 { border-color: rgba(0, 0, 0, 0.2) !important; }
+
+  /* AI chat backgrounds */
+  html.light .bg-white\/\[0\.025\] { background-color: rgba(0, 0, 0, 0.03) !important; }
+  html.light .bg-white\/\[0\.02\]  { background-color: rgba(0, 0, 0, 0.025) !important; }
+  html.light .bg-white\/\[0\.03\]  { background-color: rgba(0, 0, 0, 0.04) !important; }
+  html.light .bg-white\/\[0\.04\]  { background-color: rgba(0, 0, 0, 0.05) !important; }
+
+  /* ── Nav sidebar text ─────────────────────────────────────── */
+  html.light .text-white\/50.font-inter,
+  html.light .text-white\/50 { color: rgba(60, 60, 80, 0.7) !important; }
+
+  /* ── NeonCard text ─────────────────────────────────────────── */
+  html.light .neon-card .text-white {
+    color: rgba(20, 20, 40, 0.95) !important;
+  }
+  html.light .neon-card .text-white\/70 {
+    color: rgba(40, 40, 60, 0.8) !important;
+  }
+
+  /* ── Loading spinner overlay ───────────────────────────────── */
+  html.light .bg-cyber-black {
+    background-color: #FFFFFF !important;
+  }
+
+  /* ── Gradient badge text ───────────────────────────────────── */
+  html.light .font-mono-code {
+    color: rgba(50, 50, 70, 0.7);
+  }
+
+  /* ── Dashboard and page titles ─────────────────────────────── */
+  html.light h1, html.light h2, html.light h3 {
+    color: rgba(20, 20, 40, 0.95);
+  }
+
+  /* ── Streak badge light mode ───────────────────────────────── */
+  html.light .streak-badge {
+    background: linear-gradient(135deg, rgba(204, 100, 0, 0.12), rgba(220, 160, 0, 0.12));
+    border: 1px solid rgba(200, 120, 0, 0.3);
+  }
+  html.light .streak-badge .text-neon-amber { color: #CC7700 !important; }
+  html.light .streak-badge .text-white\/50   { color: rgba(80, 60, 0, 0.6) !important; }
+
+  /* ── Daily challenge page ──────────────────────────────────── */
+  html.light .glass-card {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 248, 255, 0.92) 100%) !important;
+    border: 1px solid rgba(0, 0, 0, 0.07) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05) !important;
+  }
+
+  /* ── Admin admin-input light mode ──────────────────────────── */
+  html.light .admin-input {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(0, 0, 0, 0.12);
+    color: #1a1a2e;
+  }
+  html.light .admin-input::placeholder { color: rgba(0, 0, 0, 0.35); }
+  html.light .admin-input:focus {
+    border-color: rgba(0, 153, 255, 0.5);
+    box-shadow: 0 0 0 3px rgba(0, 153, 255, 0.08), 0 0 20px rgba(0, 153, 255, 0.1);
+    background: rgba(0, 153, 255, 0.03);
+  }
+
+  /* ── Admin table light mode ────────────────────────────────── */
+  html.light .admin-table thead th { color: rgba(60, 60, 80, 0.55); }
+  html.light .admin-table tbody td {
+    background: rgba(255, 255, 255, 0.8);
+    border-color: rgba(0, 0, 0, 0.06);
+    color: rgba(30, 30, 50, 0.85);
+  }
+
+  /* ── Admin chip light mode ─────────────────────────────────── */
+  html.light .admin-chip {
+    background: rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.1);
+    color: rgba(50, 50, 70, 0.75);
+  }
+  html.light .admin-chip:hover {
+    border-color: rgba(0, 153, 255, 0.3);
+    color: rgba(0, 80, 180, 0.9);
+  }
+
+  /* ── Admin tab light mode ──────────────────────────────────── */
+  html.light .admin-tab {
+    background: rgba(0, 0, 0, 0.03);
+    border-color: rgba(0, 0, 0, 0.08);
+    color: rgba(50, 50, 70, 0.65);
+  }
+  html.light .admin-tab[data-active='true'] {
+    background: rgba(0, 153, 255, 0.08);
+    border-color: rgba(0, 153, 255, 0.28);
+    color: #0099FF;
+  }
+
+  /* ── Analysis chart specific ───────────────────────────────── */
+  html.light .recharts-area-dot circle {
+    stroke: #FFFFFF !important;
+  }
+
+  /* ── Toast / notification light mode ───────────────────────── */
+  html.light [role="status"],
+  html.light [role="alert"] {
+    background: rgba(255, 255, 255, 0.97) !important;
+    color: rgba(20, 20, 40, 0.9) !important;
+    border-color: rgba(0, 0, 0, 0.1) !important;
+  }
+
+  /* ── Leaderboard / history cards ───────────────────────────── */
+  html.light .bg-neon-amber\/20  { background-color: rgba(204, 136, 0, 0.12) !important; }
+  html.light .bg-neon-violet\/20 { background-color: rgba(119, 0, 204, 0.12) !important; }
+  html.light .bg-neon-green\/20  { background-color: rgba(0, 170, 85, 0.12) !important; }
+  html.light .bg-neon-cyan\/20   { background-color: rgba(0, 153, 255, 0.12) !important; }
+  html.light .bg-neon-red\/20    { background-color: rgba(255, 51, 102, 0.12) !important; }
+
+  /* ── Profile & settings page ────────────────────────────────── */
+  html.light .bg-neon-violet\/15 { background-color: rgba(119, 0, 204, 0.08) !important; }
+  html.light .bg-neon-cyan\/15   { background-color: rgba(0, 153, 255, 0.08) !important; }
+  html.light .bg-neon-green\/15  { background-color: rgba(0, 170, 85, 0.08) !important; }
+  html.light .bg-neon-amber\/15  { background-color: rgba(204, 136, 0, 0.08) !important; }
+
+  /* ── Neon violet/magenta/green text in light mode ──────────── */
+  html.light .text-neon-violet  { color: #7700CC !important; }
+  html.light .text-neon-green   { color: #00AA55 !important; }
+  html.light .text-neon-magenta { color: #CC0077 !important; }
+  html.light .text-neon-cyan    { color: #0099FF !important; }
+  html.light .text-neon-amber   { color: #CC8800 !important; }
+  html.light .text-neon-red     { color: #FF3366 !important; }
+
+  /* ── Form inputs across all pages ──────────────────────────── */
+  html.light input[type="text"],
+  html.light input[type="email"],
+  html.light input[type="password"],
+  html.light input[type="number"],
+  html.light textarea,
+  html.light select {
+    background: rgba(255, 255, 255, 0.9) !important;
+    border-color: rgba(0, 0, 0, 0.12) !important;
+    color: #1a1a2e !important;
+  }
+  html.light input::placeholder,
+  html.light textarea::placeholder {
+    color: rgba(0, 0, 0, 0.35) !important;
+  }
+
+  /* ── Footer text ────────────────────────────────────────────── */
+  html.light footer,
+  html.light .text-white\/10 { color: rgba(120, 120, 140, 0.4) !important; }
 }

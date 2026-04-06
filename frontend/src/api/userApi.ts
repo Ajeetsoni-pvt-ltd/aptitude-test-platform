@@ -58,3 +58,21 @@ export const uploadProfilePictureApi = async (file: File): Promise<ApiResponse<{
   });
   return response.data;
 };
+
+// ─── Get Global Leaderboard ────────────────────────────────────
+export const getLeaderboardApi = async (limit = 50): Promise<ApiResponse<{
+  totalUsers: number;
+  leaderboard: Array<{
+    rank: number;
+    userId: string;
+    name: string;
+    email: string;
+    score: number;
+    tests: number;
+    badge: string;
+    isCurrentUser?: boolean;
+  }>;
+}>> => {
+  const response = await apiClient.get(`/users/leaderboard?limit=${limit}`);
+  return response.data;
+};

@@ -52,6 +52,17 @@ export const deleteUserApi = async (userId: string) => {
   return response.data;
 };
 
+export const toggleUserStatusApi = async (userId: string) => {
+  const response = await apiClient.patch(`/admin/users/${userId}/status`);
+  return response.data;
+};
+
+export const getStudentAnalyticsApi = async (userId: string) => {
+  const response = await apiClient.get(`/admin/students/${userId}/analytics`);
+  return response.data;
+};
+
+
 export const getQuestionsAdminApi = async (
   page = 1,
   limit = 50,

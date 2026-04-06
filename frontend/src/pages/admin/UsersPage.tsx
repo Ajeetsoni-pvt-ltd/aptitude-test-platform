@@ -1,7 +1,8 @@
 // frontend/src/pages/admin/UsersPage.tsx
 import { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import AdminLayout from '@/components/AdminLayout';
-import { getAllUsersApi, updateUserRoleApi, deleteUserApi } from '@/api/adminApi';
+import { getAllUsersApi, updateUserRoleApi, deleteUserApi, toggleUserStatusApi } from '@/api/adminApi';
 import { useAuthStore } from '@/store/authStore';
 
 /* ─── Styles ──────────────────────────────────────────────────── */
@@ -451,6 +452,7 @@ const STYLES = `
 /* ─── Component ───────────────────────────────────────────────── */
 const UsersPage = () => {
   const { user: currentUser } = useAuthStore();
+  const navigate = useNavigate();
   const [users, setUsers]           = useState<any[]>([]);
   const [isLoading, setLoading]     = useState(true);
   const [page, setPage]             = useState(1);
@@ -491,6 +493,17 @@ const UsersPage = () => {
     setActionLoading(userId + '_del');
     try {
       await deleteUserApi(userId);
+      fetchUsers();
+    } catch (e) { console.error(e); }
+    finally { setActionLoading(null); }
+  };
+
+  const handleToggleStatus = async (userId: string, isActive: boolean) => {
+    const action = isActive ? 'deactivate' : 'activate';
+    if (!confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} this user?`)) return;
+    setActionLoading(userId + '_status');
+    try {
+      await toggleUserStatusApi(userId);
       fetchUsers();
     } catch (e) { console.error(e); }
     finally { setActionLoading(null); }
@@ -555,8 +568,6 @@ const UsersPage = () => {
                   const isSelf    = user._id === currentUser?._id;
                   const isAdmin   = user.role === 'admin';
                   const initials  = user.name?.[0]?.toUpperCase() || '?';
-                  const roleLoading = actionLoading === user._id + '_role';
-                  const delLoading  = actionLoading === user._id + '_del';
 
                   return (
                     <div key={user._id} className={`user-card${isSelf ? ' is-self' : ''}`}>
@@ -588,10 +599,32 @@ const UsersPage = () => {
                         <div className="action-row">
                           <button
                             className="role-btn"
-                            onClick={() => handleRoleChange(user._id, user.role)}
-                            disabled={!!roleLoading}
+                            style={{ background: 'rgba(0,180,200,0.1)', border: '1px solid rgba(0,180,200,0.3)', color: '#00cce8' }}
+                            onClick={() => navigate(`/admin/students/${user._id}/analytics`)}
                           >
-                            {roleLoading
+                            📊 Analytics
+                          </button>
+                          <button
+                            className="role-btn"
+                            style={
+                              user.isActive === false
+                                ? { background: 'rgba(0,200,80,0.1)', border: '1px solid rgba(0,200,80,0.3)', color: '#00c850' }
+                                : { background: 'rgba(200,100,0,0.1)', border: '1px solid rgba(200,100,0,0.3)', color: '#e08000' }
+                            }
+                            onClick={() => handleToggleStatus(user._id, user.isActive !== false)}
+                            disabled={actionLoading === user._id + '_status'}
+                          >
+                            {actionLoading === user._id + '_status'
+                              ? <><span className="btn-spin" />Processing</>
+                              : user.isActive === false ? '✅ Activate' : '🚫 Deactivate'
+                            }
+                          </button>
+                          <button
+                            className="role-btn"
+                            onClick={() => handleRoleChange(user._id, user.role)}
+                            disabled={!!actionLoading?.includes(user._id + '_role')}
+                          >
+                            {actionLoading === user._id + '_role'
                               ? <><span className="btn-spin" />Processing</>
                               : isAdmin ? '→ Student' : '→ Admin'
                             }
@@ -599,9 +632,9 @@ const UsersPage = () => {
                           <button
                             className="del-btn"
                             onClick={() => handleDelete(user._id, user.name)}
-                            disabled={!!delLoading}
+                            disabled={!!actionLoading?.includes(user._id + '_del')}
                           >
-                            {delLoading
+                            {actionLoading === user._id + '_del'
                               ? <><span className="btn-spin" />Deleting</>
                               : '🗑 Delete'
                             }
