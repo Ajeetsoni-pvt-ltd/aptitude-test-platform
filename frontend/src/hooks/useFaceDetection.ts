@@ -151,7 +151,27 @@ const useFaceDetection = (enabled: boolean): UseFaceDetectionReturn => {
       stopCamera();
     }
   }, [enabled, stopCamera]);
+  // ── Monitor for camera disconnection during test ───────
+  useEffect(() => {
+    if (!isActive || !streamRef.current) return;
 
+    const handleTrackEnded = () => {
+      setCameraError('Camera disconnected. Please reconnect to continue the test.');
+      setIsActive(false);
+      stopCamera();
+    };
+
+    const tracks = streamRef.current.getTracks();
+    tracks.forEach(track => {
+      track.addEventListener('ended', handleTrackEnded);
+    });
+
+    return () => {
+      tracks.forEach(track => {
+        track.removeEventListener('ended', handleTrackEnded);
+      });
+    };
+  }, [isActive, stopCamera]);
   return {
     videoRef,
     canvasRef,

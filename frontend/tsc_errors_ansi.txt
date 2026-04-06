@@ -1,0 +1,4 @@
+src/pages/AnalysisPage.tsx(14,3): error TS6133: 'AreaChart' is declared but its value is never read.
+src/pages/AnalysisPage.tsx(14,14): error TS6133: 'Area' is declared but its value is never read.
+src/pages/AnalysisPage.tsx(172,9): error TS6133: 'worstScore' is declared but its value is never read.
+src/pages/SettingsPage.tsx(2,20): error TS6133: 'useEffect' is declared but its value is never read.

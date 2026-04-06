@@ -17,6 +17,7 @@ interface UseAntiCheatOptions {
   mode?: AntiCheatMode;
   maxTabSwitches?: number; // default: 3
   onAutoSubmit?: () => void;
+  onViolation?: (type: string, message: string) => void;
 }
 
 interface UseAntiCheatReturn {
@@ -33,6 +34,7 @@ const useAntiCheat = ({
   mode = 'proctored',
   maxTabSwitches = 3,
   onAutoSubmit,
+  onViolation,
 }: UseAntiCheatOptions): UseAntiCheatReturn => {
   const [warningCount,     setWarningCount]     = useState(0);
   const [tabSwitchCount,   setTabSwitchCount]   = useState(0);
@@ -58,6 +60,15 @@ const useAntiCheat = ({
     setLastWarning(warning);
     setWarningCount(prev => prev + 1);
     setIsWarningVisible(true);
+
+    if (onViolation) {
+      // Map to backend violation types if possible, otherwise use 'other'
+      let mappedType = 'other';
+      if (type === 'TAB_SWITCH') mappedType = 'tab_switch';
+      if (type === 'FULLSCREEN_EXIT') mappedType = 'fullscreen_exit';
+      
+      onViolation(mappedType, message);
+    }
 
     if (isTabSwitch) {
       const newCount = tabSwitchRef.current + 1;

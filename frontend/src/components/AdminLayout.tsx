@@ -78,7 +78,7 @@ const NAV_ITEMS: NavItem[] = [
     tone: 'cyan',
   },
   {
-    path: '/admin/monitoring',
+    path: '/admin/live-proctoring',
     label: 'Live Proctoring',
     shortLabel: 'Monitoring',
     description: 'Watch camera feeds and alerts',

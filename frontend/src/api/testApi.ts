@@ -13,10 +13,28 @@ export const getSubtopicsApi = async (topic: string): Promise<ApiResponse<{
 };
 
 // ─── My Results ───────────────────────────────────────────────
-export const getMyResultsApi = async (page = 1, limit = 5) => {
-  const response = await apiClient.get(
-    `/tests/my-results?page=${page}&limit=${limit}`
-  );
+export const getMyResultsApi = async (
+  page = 1,
+  limit = 50,
+  filters?: {
+    topic?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    minScore?: number;
+    maxScore?: number;
+  }
+) => {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+  if (filters?.topic)    params.append('topic',    filters.topic);
+  if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+  if (filters?.dateTo)   params.append('dateTo',   filters.dateTo);
+  if (filters?.minScore !== undefined) params.append('minScore', String(filters.minScore));
+  if (filters?.maxScore !== undefined) params.append('maxScore', String(filters.maxScore));
+
+  const response = await apiClient.get(`/tests/my-results?${params.toString()}`);
   return response.data;
 };
 

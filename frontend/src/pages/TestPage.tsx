@@ -10,12 +10,15 @@ import useFaceDetection from '@/hooks/useFaceDetection';
 import useTimer         from '@/hooks/useTimer';
 import { useThemeStore } from '@/store/themeStore';
 import { submitTestApi } from '@/api/testApi';
+import { logViolationApi } from '@/api/proctoringApi';
 import type { Question } from '@/types';
 import { cn } from '@/lib/utils';
 import { getAssetUrl, getOptionLetter } from '@/lib/question';
 import HoloButton        from '@/components/ui/HoloButton';
+import CameraPermissionCheck from '@/components/CameraPermissionCheck';
 import ProgressRing      from '@/components/ui/ProgressRing';
 import FaceTrackerOverlay from '@/components/ui/FaceTrackerOverlay';
+import TestWatermark     from '@/components/ui/TestWatermark';
 import {
   ChevronLeft, ChevronRight, Send, AlertTriangle, Zap,
   Maximize, Minimize, Shield, Moon, Sun,
@@ -60,113 +63,129 @@ const MobileBlockScreen = () => (
 
 // ── Pre-start screen ─────────────────────────────────────────────
 const PreScreen = ({
-  title, questionCount, totalTime, isProctored, onStart,
+  title, questionCount, totalTime, isProctored, onStart, onCameraStatusChange,
 }: {
   title: string; questionCount: number; totalTime: number;
-  isProctored: boolean; onStart: () => void;
-}) => (
-  <div className="min-h-screen bg-cyber-black relative flex items-center justify-center p-4 overflow-hidden">
-    <div className="pointer-events-none absolute inset-0">
-      <div className="absolute inset-0 cyber-grid opacity-30" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full opacity-[0.06]"
-        style={{ background: `radial-gradient(circle, ${isProctored ? '#9D00FF' : '#00F5FF'}, transparent 65%)` }} />
-    </div>
+  isProctored: boolean; onStart: () => void; onCameraStatusChange?: (ready: boolean) => void;
+}) => {
+  const [isCameraReady, setIsCameraReady] = useState(false);
 
-    <div className="relative z-10 w-full max-w-md text-center animate-fade-up">
-      <div className={cn(
-        'inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-6 animate-float',
-        isProctored
-          ? 'bg-gradient-to-br from-neon-violet/15 to-neon-magenta/15 border border-neon-violet/30 shadow-[0_0_40px_rgba(157,0,255,0.2)]'
-          : 'bg-gradient-to-br from-neon-cyan/15 to-neon-violet/15 border border-neon-cyan/30 shadow-[0_0_40px_rgba(0,245,255,0.2)]'
-      )}>
-        {isProctored ? <Shield size={36} className="text-neon-violet" /> : <Zap size={36} className="text-neon-cyan" />}
+  const handleCameraStatusChange = (ready: boolean) => {
+    setIsCameraReady(ready);
+    onCameraStatusChange?.(ready);
+  };
+
+  return (
+    <div className="min-h-screen bg-cyber-black relative flex items-center justify-center p-4 overflow-hidden">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute inset-0 cyber-grid opacity-30" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full opacity-[0.06]"
+          style={{ background: `radial-gradient(circle, ${isProctored ? '#9D00FF' : '#00F5FF'}, transparent 65%)` }} />
       </div>
 
-      <div className={cn(
-        'inline-flex items-center gap-2 px-3 py-1.5 rounded-full border mb-4',
-        isProctored
-          ? 'border-neon-violet/40 bg-neon-violet/10 text-neon-violet text-xs font-mono-code'
-          : 'border-neon-cyan/40 bg-neon-cyan/10 text-neon-cyan text-xs font-mono-code'
-      )}>
-        <div className={cn('w-1.5 h-1.5 rounded-full animate-neon-pulse', isProctored ? 'bg-neon-violet' : 'bg-neon-cyan')} />
-        {isProctored ? 'PROCTORED MODE' : 'NORMAL MODE'}
-      </div>
+      <div className="relative z-10 w-full max-w-md text-center animate-fade-up">
+        <div className={cn(
+          'inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-6 animate-float',
+          isProctored
+            ? 'bg-gradient-to-br from-neon-violet/15 to-neon-magenta/15 border border-neon-violet/30 shadow-[0_0_40px_rgba(157,0,255,0.2)]'
+            : 'bg-gradient-to-br from-neon-cyan/15 to-neon-violet/15 border border-neon-cyan/30 shadow-[0_0_40px_rgba(0,245,255,0.2)]'
+        )}>
+          {isProctored ? <Shield size={36} className="text-neon-violet" /> : <Zap size={36} className="text-neon-cyan" />}
+        </div>
 
-      <h1 className="font-orbitron text-2xl font-bold text-white mb-2 tracking-wide">{title}</h1>
-      <p className="text-white/30 text-sm font-inter mb-2">
-        {questionCount} Neural Challenges · {totalTime / 60} Minutes
-      </p>
+        <div className={cn(
+          'inline-flex items-center gap-2 px-3 py-1.5 rounded-full border mb-4',
+          isProctored
+            ? 'border-neon-violet/40 bg-neon-violet/10 text-neon-violet text-xs font-mono-code'
+            : 'border-neon-cyan/40 bg-neon-cyan/10 text-neon-cyan text-xs font-mono-code'
+        )}>
+          <div className={cn('w-1.5 h-1.5 rounded-full animate-neon-pulse', isProctored ? 'bg-neon-violet' : 'bg-neon-cyan')} />
+          {isProctored ? 'PROCTORED MODE' : 'NORMAL MODE'}
+        </div>
 
-      <div className="flex justify-center gap-8 my-6">
-        {[
-          { label: 'Questions', value: questionCount, color: 'text-neon-cyan' },
-          { label: 'Minutes',   value: totalTime / 60, color: 'text-neon-amber' },
-          { label: 'Points',    value: questionCount,  color: 'text-neon-green' },
-        ].map((s) => (
-          <div key={s.label} className="text-center">
-            <p className={cn('font-orbitron text-3xl font-bold', s.color)}>{s.value}</p>
-            <p className="text-white/25 text-xs font-inter mt-0.5">{s.label}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className={cn(
-        'glass-card rounded-xl p-4 mb-6 text-left',
-        isProctored ? 'border border-neon-violet/15' : 'border border-neon-amber/15'
-      )}>
-        <p className={cn('text-xs font-semibold mb-2 flex items-center gap-1.5',
-          isProctored ? 'text-neon-violet' : 'text-neon-amber')}>
-          <AlertTriangle size={12} />
-          {isProctored ? 'Proctoring Protocols' : 'Test Protocols'}
+        <h1 className="font-orbitron text-2xl font-bold text-white mb-2 tracking-wide">{title}</h1>
+        <p className="text-white/30 text-sm font-inter mb-2">
+          {questionCount} Neural Challenges · {totalTime / 60} Minutes
         </p>
-        <ul className="space-y-1.5 text-white/35 text-xs font-inter">
-          {isProctored ? [
-            'Fullscreen mode activated automatically',
-            'Camera enabled — keep face in frame',
-            'After 3 tab switches, test auto-submits',
-            'Keyboard shortcuts (F12, DevTools) blocked',
-            'Results logged with proctoring data',
-          ] : [
-            'Auto-submits when time expires',
-            'Session cannot be retaken',
-            'No fullscreen requirement',
-          ]}
-          {(isProctored ? [] : []).map((r) => (
-            <li key={r} className="flex items-center gap-2">
-              <span className="text-neon-amber/50">▸</span> {r}
-            </li>
-          ))}
-          {(isProctored ? [
-            'Fullscreen mode activated automatically',
-            'Camera enabled — keep face in frame',
-            'After 3 tab switches, test auto-submits',
-            'Keyboard shortcuts (F12, DevTools) blocked',
-            'Results logged with proctoring data',
-          ] : [
-            'Auto-submits when time expires',
-            'Session cannot be retaken',
-            'No fullscreen requirement',
-          ]).map((r) => (
-            <li key={r} className="flex items-center gap-2">
-              <span className={cn(isProctored ? 'text-neon-violet/50' : 'text-neon-amber/50')}>▸</span> {r}
-            </li>
-          ))}
-        </ul>
-      </div>
 
-      <HoloButton
-        variant={isProctored ? 'violet' : 'cyan'}
-        size="xl"
-        fullWidth
-        onClick={onStart}
-        className="font-orbitron tracking-widest"
-        icon={isProctored ? <Shield size={18} /> : <Maximize size={18} />}
-      >
-        {isProctored ? 'ENTER PROCTORED TEST' : 'START TEST'}
-      </HoloButton>
+        <div className="flex justify-center gap-8 my-6">
+          {[
+            { label: 'Questions', value: questionCount, color: 'text-neon-cyan' },
+            { label: 'Minutes',   value: totalTime / 60, color: 'text-neon-amber' },
+            { label: 'Points',    value: questionCount,  color: 'text-neon-green' },
+          ].map((s) => (
+            <div key={s.label} className="text-center">
+              <p className={cn('font-orbitron text-3xl font-bold', s.color)}>{s.value}</p>
+              <p className="text-white/25 text-xs font-inter mt-0.5">{s.label}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Camera check for proctored tests */}
+        {isProctored && (
+          <div className="mb-6 animate-fade-up">
+            <CameraPermissionCheck 
+              onCameraReady={handleCameraStatusChange}
+              onError={(error) => console.error('[Proctoring] Camera error:', error)}
+            />
+          </div>
+        )}
+
+        <div className={cn(
+          'glass-card rounded-xl p-4 mb-6 text-left',
+          isProctored ? 'border border-neon-violet/15' : 'border border-neon-amber/15'
+        )}>
+          <p className={cn('text-xs font-semibold mb-2 flex items-center gap-1.5',
+            isProctored ? 'text-neon-violet' : 'text-neon-amber')}>
+            <AlertTriangle size={12} />
+            {isProctored ? 'Proctoring Protocols' : 'Test Protocols'}
+          </p>
+          <ul className="space-y-1.5 text-white/35 text-xs font-inter">
+            {(isProctored ? [
+              'Fullscreen mode activated automatically',
+              'Camera enabled — keep face in frame',
+              'After 3 tab switches, test auto-submits',
+              'Keyboard shortcuts (F12, DevTools) blocked',
+              'Results logged with proctoring data',
+            ] : [
+              'Auto-submits when time expires',
+              'Session cannot be retaken',
+              'No fullscreen requirement',
+            ]).map((r) => (
+              <li key={r} className="flex items-center gap-2">
+                <span className={cn(isProctored ? 'text-neon-violet/50' : 'text-neon-amber/50')}>▸</span> {r}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <HoloButton
+          variant={isProctored ? 'violet' : 'cyan'}
+          size="xl"
+          fullWidth
+          onClick={onStart}
+          disabled={isProctored && !isCameraReady}
+          className={cn(
+            'font-orbitron tracking-widest',
+            isProctored && !isCameraReady && 'opacity-50 cursor-not-allowed'
+          )}
+          icon={isProctored ? <Shield size={18} /> : <Maximize size={18} />}
+        >
+          {isProctored 
+            ? (isCameraReady ? 'ENTER PROCTORED TEST' : '⏳ WAITING FOR CAMERA')
+            : 'START TEST'
+          }
+        </HoloButton>
+
+        {isProctored && !isCameraReady && (
+          <p className="text-xs text-neon-red/60 font-inter mt-3">
+            ⚠️ Please verify your camera before starting the test
+          </p>
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ── Main component ───────────────────────────────────────────────
 const TestPage = () => {
@@ -215,6 +234,20 @@ const TestContent = ({
   const [submitting, setSubmitting] = useState(false);
   const autoSubmitCalledRef         = useRef(false);
 
+  // ── Extract student email from localStorage ──────────────────
+  const studentEmail = (() => {
+    try {
+      const userStr = localStorage.getItem('apt_user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        return user.email || 'Student';
+      }
+    } catch {
+      // In case of parsing error, silently fail
+    }
+    return 'Student';
+  })();
+
   // ── Face Detection (proctored only) ─────────────────────────
   const {
     videoRef, isFaceDetected, isActive: cameraActive,
@@ -235,7 +268,30 @@ const TestContent = ({
       mode:          isProctored ? 'proctored' : 'normal',
       maxTabSwitches: MAX_TAB_SWITCHES,
       onAutoSubmit:  handleAutoSubmit,
+      onViolation: (type, message) => {
+        if (isProctored) {
+          logViolationApi(attemptId, { type, details: message }).catch(() => {});
+        }
+      }
     });
+
+  // Track face missing duration to avoid spamming the API
+  const faceMissingSinceRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!started || !isProctored || cameraError || !cameraActive) return;
+
+    if (!isFaceDetected) {
+      if (!faceMissingSinceRef.current) {
+        faceMissingSinceRef.current = Date.now();
+      } else if (Date.now() - faceMissingSinceRef.current > 3000) { // 3 seconds continuous missing
+        logViolationApi(attemptId, { type: 'face_missing', details: 'Face not detected for over 3 seconds continuously.' }).catch(() => {});
+        faceMissingSinceRef.current = Date.now(); // Reset to log again after another 3s if still missing
+      }
+    } else {
+      faceMissingSinceRef.current = null;
+    }
+  }, [isFaceDetected, started, isProctored, cameraError, cameraActive, attemptId]);
 
   // ── Submit handler ───────────────────────────────────────────
   const handleSubmit = useCallback(
@@ -306,6 +362,8 @@ const TestContent = ({
 
   return (
     <div className="min-h-screen bg-cyber-black flex flex-col overflow-hidden">
+      {/* ── Test Watermark ────────────────────────────────── */}
+      <TestWatermark studentEmail={studentEmail} />
 
       {/* ── Face Tracker Overlay (proctored only) ──────────── */}
       {isProctored && (
@@ -318,6 +376,28 @@ const TestContent = ({
           tabSwitchCount={tabSwitchCount}
           maxTabSwitches={MAX_TAB_SWITCHES}
         />
+      )}
+
+      {/* ── Camera disconnection warning modal ────────────── */}
+      {isProctored && cameraError && started && (
+        <div className="fixed inset-0 z-[60] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+          <div className="glass-strong rounded-2xl border border-neon-red/40 shadow-[0_0_40px_rgba(255,51,102,0.3)] p-8 max-w-sm w-full text-center">
+            <div className="w-16 h-16 rounded-2xl bg-neon-red/15 border border-neon-red/30 flex items-center justify-center mx-auto mb-4 animate-neon-pulse">
+              <AlertTriangle size={32} className="text-neon-red" />
+            </div>
+            <h2 className="font-orbitron text-lg font-bold text-neon-red mb-2">Camera Disconnected</h2>
+            <p className="text-white/60 text-sm font-inter mb-6 leading-relaxed">{cameraError}</p>
+            <HoloButton 
+              variant="danger" 
+              fullWidth
+              onClick={() => {
+                handleSubmit(false);
+              }}
+            >
+              End Test & Submit
+            </HoloButton>
+          </div>
+        </div>
       )}
 
       {/* ── Anti-cheat warning modal ───────────────────────── */}
@@ -489,7 +569,17 @@ const TestContent = ({
                 return (
                   <button
                     key={i}
-                    onClick={() => setAnswers((prev) => ({ ...prev, [q._id]: optionLetter }))}
+                    onClick={() => {
+                      setAnswers((prev) => {
+                        // Toggle selection: if already selected, deselect; otherwise select
+                        if (prev[q._id] === optionLetter) {
+                          const newAnswers = { ...prev };
+                          delete newAnswers[q._id];
+                          return newAnswers;
+                        }
+                        return { ...prev, [q._id]: optionLetter };
+                      });
+                    }}
                     className={cn(
                       'answer-option w-full flex flex-col items-start gap-4 text-left animate-fade-up',
                       selected && 'selected',
@@ -534,6 +624,24 @@ const TestContent = ({
                 );
               })}
             </div>
+
+            {/* Clear Response Button */}
+            {answers[q._id] && (
+              <div className="mt-6 flex justify-center">
+                <HoloButton
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setAnswers((prev) => {
+                    const newAnswers = { ...prev };
+                    delete newAnswers[q._id];
+                    return newAnswers;
+                  })}
+                  className="text-neon-amber hover:text-neon-amber/80"
+                >
+                  Clear Response
+                </HoloButton>
+              </div>
+            )}
 
             {/* Prev / Next */}
             <div className="flex justify-between mt-8">
