@@ -296,46 +296,20 @@ export const submitTest = asyncHandler(async (req: Request, res: Response) => {
 // ═══════════════════════════════════════════════════════════════
 export const getMyResults = asyncHandler(
   async (req: Request, res: Response) => {
-    const { page, limit, topic, dateFrom, dateTo, minScore, maxScore } = req.query;
+    const { page, limit } = req.query;
 
     const pageNumber = Math.max(1, parseInt(page as string) || 1);
-    const limitNumber = Math.min(100, parseInt(limit as string) || 20);
+    const limitNumber = Math.min(20, parseInt(limit as string) || 10);
     const skip = (pageNumber - 1) * limitNumber;
 
-    // Build filter
-    const filter: Record<string, any> = { user: req.user!.id };
-
-    // Date range filter
-    if (dateFrom || dateTo) {
-      filter.createdAt = {};
-      if (dateFrom) filter.createdAt.$gte = new Date(dateFrom as string);
-      if (dateTo) {
-        const to = new Date(dateTo as string);
-        to.setHours(23, 59, 59, 999);
-        filter.createdAt.$lte = to;
-      }
-    }
-
-    // Score range filter
-    if (minScore !== undefined) filter.score = { ...filter.score, $gte: parseInt(minScore as string) };
-    if (maxScore !== undefined) filter.score = { ...filter.score, $lte: parseInt(maxScore as string) };
-
-    // Topic filter (check title or topicPerformance keys)
-    if (topic) {
-      filter.$or = [
-        { title: { $regex: topic as string, $options: 'i' } },
-        { [`topicPerformance.${topic}`]: { $exists: true } },
-      ];
-    }
-
     const [attempts, totalCount] = await Promise.all([
-      TestAttempt.find(filter)
-        .sort({ createdAt: -1 })
+      TestAttempt.find({ user: req.user!.id })
+        .sort({ createdAt: -1 })   // Latest first
         .skip(skip)
         .limit(limitNumber)
-        .select('-answers -questions')
-        .lean(),
-      TestAttempt.countDocuments(filter),
+        .select('-answers -questions') // Summary only (detailed data chhota raho)
+        .lean(),                       // .lean() → plain JS object, faster
+      TestAttempt.countDocuments({ user: req.user!.id }),
     ]);
 
     res.status(200).json(
