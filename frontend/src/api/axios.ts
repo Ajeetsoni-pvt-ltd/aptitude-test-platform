@@ -11,7 +11,7 @@ const BASE_URL =
 
 // ─── Axios Instance ───────────────────────────────────────────
 const apiClient = axios.create({
-  baseURL: `${BASE_URL}/api`, // ✅ IMPORTANT (/api added)
+ baseURL: BASE_URL,// ✅ IMPORTANT (/api added)
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
