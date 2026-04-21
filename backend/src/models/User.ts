@@ -6,6 +6,9 @@ export interface IUser extends Document {
   name: string;
   email: string;
   password: string;         // yeh hashed hoga
+  collegeName: string;
+  branch: string;
+  section: string;
   role: 'student' | 'admin';
   profilePicture?: string;  // URL to profile picture
   createdAt: Date;
@@ -34,6 +37,24 @@ const userSchema = new Schema<IUser>(
       required: [true, 'Password daalna zaroori hai'],
       minlength: [6, 'Password kam se kam 6 characters ka hona chahiye'],
       select: false, // security: password queries mein by default nahi aayega
+    },
+    collegeName: {
+      type: String,
+      required: [true, 'College name daalna zaroori hai'],
+      trim: true,
+      minlength: [2, 'College name kam se kam 2 characters ka hona chahiye'],
+    },
+    branch: {
+      type: String,
+      required: [true, 'Branch daalna zaroori hai'],
+      trim: true,
+      minlength: [2, 'Branch kam se kam 2 characters ka hona chahiye'],
+    },
+    section: {
+      type: String,
+      required: [true, 'Section daalna zaroori hai'],
+      trim: true,
+      minlength: [1, 'Section daalna zaroori hai'],
     },
     role: {
       type: String,

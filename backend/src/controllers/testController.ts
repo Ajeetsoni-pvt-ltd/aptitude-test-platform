@@ -15,30 +15,44 @@ import asyncHandler from '../utils/asyncHandler';
 import { successResponse, errorResponse } from '../utils/ApiResponse';
 import { normalizeQuestions } from '../utils/normalizeQuestion';
 
+const normalizeTopic = (topic: unknown) =>
+  typeof topic === 'string' ? topic.trim() : '';
+
 // ═══════════════════════════════════════════════════════════════
 // @desc    Get subtopics for a specific topic
 // @route   GET /api/tests/subtopics/:topic
 // @access  Private (login required)
 // ═══════════════════════════════════════════════════════════════
 export const getSubtopics = asyncHandler(async (req: Request, res: Response) => {
-  const { topic } = req.params;
+  const topic = normalizeTopic(req.params.topic);
 
   if (!topic) {
     res.status(400).json(errorResponse('Topic parameter is required.'));
     return;
   }
 
-  // Fetch unique subtopics for the given topic
-  const subtopics = await Question.distinct('subtopic', { 
-    topic: topic,
-    subtopic: { $nin: ['', null] } // Only non-empty subtopics
+  console.info('[tests:get-subtopics]', { topic });
+
+  const subtopics = await Question.distinct('subtopic', {
+    topic,
+    subtopic: { $nin: ['', null] }
+  });
+
+  const normalizedSubtopics = (subtopics || [])
+    .filter((subtopic): subtopic is string => typeof subtopic === 'string' && Boolean(subtopic.trim()))
+    .map((subtopic) => subtopic.trim())
+    .sort((first, second) => first.localeCompare(second));
+
+  console.info('[tests:get-subtopics:result]', {
+    topic,
+    total: normalizedSubtopics.length,
   });
 
   res.status(200).json(
     successResponse('Subtopics fetched successfully.', {
       topic,
-      subtopics: subtopics.sort() || [],
-      total: subtopics.length,
+      subtopics: normalizedSubtopics,
+      total: normalizedSubtopics.length,
     })
   );
 });

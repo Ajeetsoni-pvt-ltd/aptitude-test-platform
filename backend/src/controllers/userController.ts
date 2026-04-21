@@ -222,9 +222,86 @@ export const uploadProfilePicture = asyncHandler(async (req: Request, res: Respo
   );
 });
 
+// ═══════════════════════════════════════════════════════════════
+// @desc    Get global leaderboard (top performers by avg score)
+// @route   GET /api/users/leaderboard?limit=50
+// @access  Private (login required)
+// ═══════════════════════════════════════════════════════════════
+export const getLeaderboard = asyncHandler(async (req: Request, res: Response) => {
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
+  const currentUserId = req.user?.id;
+
+  // Aggregate: group by user, compute avg score + test count
+  const leaderboardRaw = await TestAttempt.aggregate([
+    {
+      $group: {
+        _id: '$user',
+        avgScore: { $avg: '$score' },
+        totalTests: { $sum: 1 },
+        bestScore: { $max: '$score' },
+      },
+    },
+    { $sort: { avgScore: -1, totalTests: -1 } },
+    { $limit: limit },
+    {
+      $lookup: {
+        from: 'users',
+        localField: '_id',
+        foreignField: '_id',
+        as: 'userInfo',
+      },
+    },
+    { $unwind: '$userInfo' },
+    {
+      $project: {
+        _id: 0,
+        userId: '$_id',
+        name: '$userInfo.name',
+        email: '$userInfo.email',
+        avgScore: { $round: ['$avgScore', 1] },
+        totalTests: 1,
+        bestScore: 1,
+      },
+    },
+  ]);
+
+  const getBadge = (avgScore: number, tests: number): string => {
+    if (avgScore >= 90 && tests >= 5) return 'Neural Master';
+    if (avgScore >= 80) return 'Elite';
+    if (avgScore >= 70) return 'Advanced';
+    if (avgScore >= 60) return 'Proficient';
+    if (avgScore >= 50) return 'Intermediate';
+    return 'Beginner';
+  };
+
+  const leaderboard = leaderboardRaw.map((entry, index) => ({
+    rank: index + 1,
+    userId: entry.userId.toString(),
+    name: entry.name,
+    email: entry.email,
+    score: entry.avgScore,
+    tests: entry.totalTests,
+    badge: getBadge(entry.avgScore, entry.totalTests),
+    isCurrentUser: currentUserId ? entry.userId.toString() === currentUserId : false,
+  }));
+
+  console.info('[users:leaderboard]', {
+    totalEntries: leaderboard.length,
+    requestedLimit: limit,
+  });
+
+  res.status(200).json(
+    successResponse('Leaderboard fetched successfully.', {
+      totalUsers: leaderboard.length,
+      leaderboard,
+    })
+  );
+});
+
 export default {
   getProfile,
   getStats,
   updateProfile,
   uploadProfilePicture,
+  getLeaderboard,
 };
