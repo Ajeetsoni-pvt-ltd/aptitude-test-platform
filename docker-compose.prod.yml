@@ -12,12 +12,12 @@ services:
     restart: unless-stopped
 
   frontend:
-    image: ghcr.io/${GHCR_OWNER}/aptitude-test-platform-frontend:${IMAGE_TAG:-latest}
+    image: ghcr.io/ajeetsoni-pvt-ltd/aptitude-test-platform-frontend:${IMAGE_TAG:-latest}
     container_name: aptitude_frontend
     restart: unless-stopped
 
   backend:
-    image: ghcr.io/${GHCR_OWNER}/aptitude-test-platform-backend:${IMAGE_TAG:-latest}
+    image: ghcr.io/ajeetsoni-pvt-ltd/aptitude-test-platform-backend:${IMAGE_TAG:-latest}
     container_name: aptitude_backend
     env_file:
       - .env.production
