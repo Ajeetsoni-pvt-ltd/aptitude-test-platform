@@ -1,10 +1,3 @@
-// backend/src/controllers/authController.ts
-// ─────────────────────────────────────────────────────────────
-// Auth Controller: Register + Login + GetMe
-// Kyun controller alag: Business logic routes se alag rahega
-// asyncHandler: try-catch automatically handle hoga
-// ─────────────────────────────────────────────────────────────
-
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import User from '../models/User';
@@ -12,58 +5,74 @@ import asyncHandler from '../utils/asyncHandler';
 import generateToken from '../utils/generateToken';
 import { successResponse, errorResponse } from '../utils/ApiResponse';
 
-// ═══════════════════════════════════════════════════════════════
-// @desc    Register a new user
-// @route   POST /api/auth/register
-// @access  Public (koi bhi call kar sakta hai — login ki zaroorat nahi)
-// ═══════════════════════════════════════════════════════════════
-export const register = asyncHandler(async (req: Request, res: Response) => {
-  // Step 1: Request body se data nikalo
-  const { name, email, password, role } = req.body;
+const normalizeEmail = (email: unknown) =>
+  typeof email === 'string' ? email.toLowerCase().trim() : '';
 
-  // Step 2: Required fields check karo
-  if (!name || !email || !password) {
-    res.status(400).json(errorResponse('Name, email aur password required hain.'));
+const normalizeTextField = (value: unknown) =>
+  typeof value === 'string' ? value.trim() : '';
+
+const logAuthDebug = (context: string, payload: Record<string, unknown>) => {
+  if (process.env.NODE_ENV === 'test') {
     return;
   }
 
-  // Step 3: Password minimum length check
-  if (password.length < 6) {
+  console.info(`[auth:${context}]`, payload);
+};
+
+export const register = asyncHandler(async (req: Request, res: Response) => {
+  const { password, role } = req.body;
+  const name = normalizeTextField(req.body.name);
+  const email = normalizeEmail(req.body.email);
+  const collegeName = normalizeTextField(req.body.collegeName);
+  const branch = normalizeTextField(req.body.branch);
+  const section = normalizeTextField(req.body.section);
+
+  logAuthDebug('register-request', {
+    email,
+    hasName: Boolean(name),
+    hasPassword: Boolean(password),
+    hasCollegeName: Boolean(collegeName),
+    hasBranch: Boolean(branch),
+    hasSection: Boolean(section),
+  });
+
+  if (!name || !email || !password || !collegeName || !branch || !section) {
+    res.status(400).json(
+      errorResponse('Name, email, password, college name, branch aur section required hain.')
+    );
+    return;
+  }
+
+  if (typeof password !== 'string' || password.length < 6) {
     res.status(400).json(errorResponse('Password kam se kam 6 characters ka hona chahiye.'));
     return;
   }
 
-  // Step 4: Email already exist karti hai? (duplicate check)
-  // Kyun: MongoDB pe bhi unique index hai — lekin pehle yahan check karo
-  // taaki clear error message de sakein
-  const existingUser = await User.findOne({ email: email.toLowerCase() });
+  const existingUser = await User.findOne({ email });
   if (existingUser) {
-    res.status(400).json(errorResponse('Yeh email already registered hai. Login karo ya alag email use karo.'));
+    res
+      .status(400)
+      .json(errorResponse('Yeh email already registered hai. Login karo ya alag email use karo.'));
     return;
   }
 
-  // Step 5: Password hash karo (bcrypt saltRounds = 12)
-  // saltRounds 10-12 ideal hai: security aur speed ka balance
-  // 10 → fast but less secure | 14 → very secure but slow
-  const saltRounds = 12;
-  const hashedPassword = await bcrypt.hash(password, saltRounds);
+  const hashedPassword = await bcrypt.hash(password, 10);
 
-  // Step 6: User MongoDB mein save karo
-  // Note: role 'admin' sirf allowed users ke liye — warna default 'student'
   const user = await User.create({
     name,
-    email: email.toLowerCase(), // hamesha lowercase mein store karo
-    password: hashedPassword,   // plain password KABHI nahi, sirf hash
-    role: role === 'admin' ? 'admin' : 'student', // safety check
+    email,
+    password: hashedPassword,
+    collegeName,
+    branch,
+    section,
+    role: role === 'admin' ? 'admin' : 'student',
   });
 
-  // Step 7: JWT token generate karo
   const token = generateToken({
     id: user._id.toString(),
     role: user.role,
   });
 
-  // Step 8: Response bhejo (password field include mat karo!)
   res.status(201).json(
     successResponse('Registration successful! Welcome to Aptitude Test Platform.', {
       token,
@@ -71,63 +80,78 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
         _id: user._id,
         name: user.name,
         email: user.email,
+        collegeName: user.collegeName,
+        branch: user.branch,
+        section: user.section,
         role: user.role,
       },
     })
   );
 });
 
-
-
-
-
-
-
-
-// ═══════════════════════════════════════════════════════════════
-// @desc    Login user
-// @route   POST /api/auth/login
-// @access  Public
-// ═══════════════════════════════════════════════════════════════
 export const login = asyncHandler(async (req: Request, res: Response) => {
-  // Step 1: Request body se email aur password nikalo
-  const { email, password } = req.body;
+  const email = normalizeEmail(req.body.email);
+  const password = typeof req.body.password === 'string' ? req.body.password : '';
 
-  // Step 2: Required fields check
+  logAuthDebug('login-request', {
+    email,
+    hasPassword: Boolean(password),
+  });
+
   if (!email || !password) {
     res.status(400).json(errorResponse('Email aur password dono required hain.'));
     return;
   }
 
-  // Step 3: User dhundo DB mein
-  // .select('+password') → kyunki User model mein password: select:false hai
-  // Bina iske password field nahi aayega → bcrypt compare fail hoga
-  const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
+  const user = await User.findOne({ email }).select('+password');
 
-  // Step 4: User exist nahi karta
-  // Security tip: "Email ya password galat hai" — alag-alag mat batao
-  // Kyun? Attacker ko pata nahi chalna chahiye ki email exist karti hai ya nahi
   if (!user) {
+    console.warn('[auth:login-user-not-found]', { email });
     res.status(401).json(errorResponse('Email ya password galat hai.'));
     return;
   }
 
-  // Step 5: Password compare karo
-  // bcrypt.compare(plain, hashed) → true ya false return karta hai
+  if (!user.password) {
+    console.warn('[auth:login-missing-password-hash]', {
+      email,
+      userId: user._id.toString(),
+    });
+    res.status(401).json(errorResponse('Email ya password galat hai.'));
+    return;
+  }
+
+  // Detect plain-text password in DB (migration needed)
+  const isBcryptHash = /^\$2[aby]\$\d{2}\$/.test(user.password);
+  if (!isBcryptHash) {
+    console.error('[auth:login-plain-text-password-detected]', {
+      email,
+      userId: user._id.toString(),
+      hint: 'Run: npx ts-node src/utils/rehashPasswords.ts to fix this',
+    });
+    res.status(401).json(
+      errorResponse(
+        'Account password format outdated. Please contact admin to reset your password.'
+      )
+    );
+    return;
+  }
+
   const isPasswordMatch = await bcrypt.compare(password, user.password);
 
   if (!isPasswordMatch) {
+    console.warn('[auth:login-password-mismatch]', {
+      email,
+      userId: user._id.toString(),
+    });
     res.status(401).json(errorResponse('Email ya password galat hai.'));
     return;
   }
 
-  // Step 6: JWT Token generate karo
   const token = generateToken({
     id: user._id.toString(),
     role: user.role,
   });
 
-  // Step 7: Successful login response
   res.status(200).json(
     successResponse('Login successful! Welcome back.', {
       token,
@@ -135,21 +159,16 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
         _id: user._id,
         name: user.name,
         email: user.email,
+        collegeName: user.collegeName,
+        branch: user.branch,
+        section: user.section,
         role: user.role,
       },
     })
   );
 });
 
-
-// ═══════════════════════════════════════════════════════════════
-// @desc    Get current logged-in user profile
-// @route   GET /api/auth/me
-// @access  Private (token required — Step 4 mein protect middleware add karenge)
-// ═══════════════════════════════════════════════════════════════
 export const getMe = asyncHandler(async (req: Request, res: Response) => {
-  // req.user → Step 4 mein JWT middleware set karega
-  // Abhi placeholder hai — Step 4 ke baad kaam karega
   const user = await User.findById(req.user?.id);
 
   if (!user) {
@@ -162,6 +181,9 @@ export const getMe = asyncHandler(async (req: Request, res: Response) => {
       _id: user._id,
       name: user.name,
       email: user.email,
+      collegeName: user.collegeName,
+      branch: user.branch,
+      section: user.section,
       role: user.role,
       createdAt: user.createdAt,
     })
