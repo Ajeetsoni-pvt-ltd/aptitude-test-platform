@@ -94,6 +94,6 @@ jobs:
             git checkout main
             git reset --hard origin/main
             echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
-            GHCR_OWNER="$GHCR_OWNER" IMAGE_TAG=latest docker-compose -f docker-compose.prod.yml pull
-            GHCR_OWNER="$GHCR_OWNER" IMAGE_TAG=latest docker-compose -f docker-compose.prod.yml up -d --remove-orphans
+            GHCR_OWNER="$GHCR_OWNER" IMAGE_TAG=latest docker compose -f docker-compose.prod.yml pull
+            GHCR_OWNER="$GHCR_OWNER" IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d --remove-orphans
             docker image prune -f
