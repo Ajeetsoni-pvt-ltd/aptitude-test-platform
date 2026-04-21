@@ -14,6 +14,7 @@ import type { User, LoginFormData, RegisterFormData } from '@/types';
 // Prefix 'apt_' → other apps ke keys se conflict nahi hoga
 const TOKEN_KEY = 'apt_token';
 const USER_KEY  = 'apt_user';
+const normalizeEmail = (email: string) => email.toLowerCase().trim();
 
 // ─── Store State + Actions ka TypeScript Type ─────────────────
 interface AuthState {
@@ -75,7 +76,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true, error: null });
     try {
       // API call
-      const response = await loginApi(data);
+      const response = await loginApi({
+        ...data,
+        email: normalizeEmail(data.email),
+      });
       const { token, user } = response.data;
 
       // localStorage mein save karo (persistence ke liye)
@@ -109,7 +113,14 @@ export const useAuthStore = create<AuthState>((set) => ({
       const { confirmPassword, ...registerData } = data;
       void confirmPassword; // TypeScript unused var warning avoid
 
-      const response = await registerApi(registerData);
+      const response = await registerApi({
+        ...registerData,
+        name: registerData.name.trim(),
+        email: normalizeEmail(registerData.email),
+        collegeName: registerData.collegeName.trim(),
+        branch: registerData.branch.trim(),
+        section: registerData.section.trim(),
+      });
       const { token, user } = response.data;
 
       localStorage.setItem(TOKEN_KEY, token);

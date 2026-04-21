@@ -44,7 +44,7 @@ const LoginPage = () => {
     e.preventDefault();
     if (!validate()) return;
     try {
-      await login({ email: formData.email, password: formData.password });
+      await login({ email: formData.email.trim(), password: formData.password });
       navigate('/dashboard', { replace: true });
     } catch { /* error in store */ }
   };
@@ -146,15 +146,8 @@ const LoginPage = () => {
               </HoloButton>
             </form>
 
-            {/* Divider */}
-            <div className="flex items-center gap-3 my-6">
-              <div className="flex-1 h-px bg-white/8" />
-              <span className="text-white/20 text-xs font-inter">or</span>
-              <div className="flex-1 h-px bg-white/8" />
-            </div>
-
             {/* Register link */}
-            <p className="text-center text-white/35 text-sm font-inter">
+            <p className="text-center text-white/35 text-sm font-inter mt-6">
               New to Nexus?{' '}
               <Link to="/register" className="text-neon-cyan hover:text-neon-cyan/80 font-semibold transition-colors hover:underline underline-offset-2">
                 Create account →

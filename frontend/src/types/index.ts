@@ -2,6 +2,9 @@ export interface User {
   _id: string;
   name: string;
   email: string;
+  collegeName: string;
+  branch: string;
+  section: string;
   role: 'student' | 'admin';
   createdAt?: string;
 }
@@ -59,6 +62,9 @@ export interface LoginFormData {
 export interface RegisterFormData {
   name: string;
   email: string;
+  collegeName: string;
+  branch: string;
+  section: string;
   password: string;
   confirmPassword: string;
 }

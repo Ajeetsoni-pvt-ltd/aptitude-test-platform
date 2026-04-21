@@ -84,7 +84,7 @@ const LeaderboardPage = () => {
             </NeonCard>
           ))
         ) : topThree.length >= 3 ? (
-          topThree.map((l, i) => {
+          topThree.map((l) => {
             const actualRank = l.rank;
             const color = RANK_COLORS[actualRank as keyof typeof RANK_COLORS] ?? 'neon-cyan';
             const heights = actualRank === 2 ? 'h-28' : actualRank === 1 ? 'h-36' : 'h-24';
@@ -137,22 +137,24 @@ const LeaderboardPage = () => {
           </div>
         ) : (
           <div className="space-y-2">
-            {leaders.map((l, i) => {
-              const isMe = user?.name === l.name;
-              const rankColor = RANK_COLORS[l.rank as keyof typeof RANK_COLORS];
+           {leaders.map((l, i) => {
+  void i; // ✅ FIX
 
-              return (
-                <div
-                  key={l.userId}
-                  className={cn(
-                    'flex items-center gap-4 px-4 py-3.5 rounded-xl border transition-all duration-300',
-                    isMe
-                      ? 'border-neon-cyan/40 bg-neon-cyan/8 shadow-[0_0_20px_rgba(0,245,255,0.08)]'
-                      : 'border-white/5 bg-white/[0.02] hover:border-white/12',
-                    'animate-fade-up'
-                  )}
-                  style={{ animationDelay: `${i * 0.05}s` }}
-                >
+  const isMe = user?.name === l.name;
+  const rankColor = RANK_COLORS[l.rank as keyof typeof RANK_COLORS];
+
+  return (
+    <div
+      key={l.userId}
+      className={cn(
+        'flex items-center gap-4 px-4 py-3.5 rounded-xl border transition-all duration-300',
+        isMe
+          ? 'border-neon-cyan/40 bg-neon-cyan/8 shadow-[0_0_20px_rgba(0,245,255,0.08)]'
+          : 'border-white/5 bg-white/[0.02] hover:border-white/12',
+        'animate-fade-up'
+      )}
+      style={{ animationDelay: `${i * 0.05}s` }}
+    >
                   {/* Rank */}
                   <div className={cn(
                     'w-8 h-8 rounded-lg flex items-center justify-center font-orbitron text-sm font-bold flex-shrink-0',

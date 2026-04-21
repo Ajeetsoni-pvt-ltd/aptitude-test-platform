@@ -168,7 +168,8 @@ const QuestionsPage = () => {
           pageSize,
           topic,
           difficulty,
-          questionType
+          questionType,
+          subtopic
         );
 
         if (response.success && response.data) {
@@ -194,7 +195,7 @@ const QuestionsPage = () => {
         setIsInitialLoad(false);
       }
     },
-    [topic, difficulty, questionType, pageSize]
+    [topic, subtopic, difficulty, questionType, pageSize]
   );
 
   // Load questions when filters change
@@ -202,7 +203,7 @@ const QuestionsPage = () => {
     setCurrentPage(1);
     setQuestions([]);
     fetchQuestions(1);
-  }, [topic, difficulty, questionType]);
+  }, [topic, subtopic, difficulty, questionType]);
 
   // Infinite scroll observer
   useEffect(() => {

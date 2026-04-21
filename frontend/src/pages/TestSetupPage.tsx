@@ -78,15 +78,25 @@ const TestSetupPage = () => {
       setSubtopicsError('');
       try {
         const res = await getSubtopicsApi(topic);
+        console.info('Subtopics API response:', res);
+
         if (res.success && res.data) {
-          setSubtopics(res.data.subtopics);
+          const nextSubtopics = Array.isArray(res.data.subtopics) ? res.data.subtopics : [];
+          setSubtopics(nextSubtopics);
           setSelectedSubtopics([]); // Reset selection when topic changes
+          if (!Array.isArray(res.data.subtopics)) {
+            setSubtopicsError('Subtopics response was malformed.');
+          }
+        } else {
+          setSubtopics([]);
+          setSubtopicsError(res.message || 'No subtopics found for the selected topic.');
         }
       } catch (err: unknown) {
         const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message 
           || 'Failed to fetch subtopics. Try again.';
         setSubtopicsError(msg);
         setSubtopics([]);
+        console.error('Failed to fetch subtopics for topic:', topic, err);
       } finally {
         setSubtopicsLoading(false);
       }
@@ -107,12 +117,6 @@ const TestSetupPage = () => {
   // Called when user clicks "Start Now" inside the modal
   const handleLaunch = async (config: StartTestConfig) => {
     if (!topic) { setError('Please select a topic first.'); return; }
-    
-    // Validate subtopics if they exist
-    if (subtopics.length > 0 && selectedSubtopics.length === 0) {
-      setError('Please select at least one subtopic.');
-      return;
-    }
 
     setError('');
     setLoading(true);
@@ -270,7 +274,24 @@ const TestSetupPage = () => {
 
               {!subtopicsLoading && subtopics.length > 0 && (
                 <div>
-                  <p className="text-white/40 text-xs uppercase tracking-widest mb-3 font-inter">Available Subtopics ({subtopics.length})</p>
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-white/40 text-xs uppercase tracking-widest font-inter">Available Subtopics ({subtopics.length})</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setSelectedSubtopics([...subtopics])}
+                        className="text-xs text-neon-magenta hover:underline font-inter"
+                      >
+                        Select All
+                      </button>
+                      <span className="text-white/20">·</span>
+                      <button
+                        onClick={() => setSelectedSubtopics([])}
+                        className="text-xs text-white/40 hover:text-white/60 font-inter"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
                   <div className="space-y-2 mb-4">
                     {subtopics.map((subtopic) => (
                       <button
@@ -305,7 +326,7 @@ const TestSetupPage = () => {
                     ))}
                   </div>
 
-                  {selectedSubtopics.length > 0 && (
+                  {selectedSubtopics.length > 0 ? (
                     <div className="p-3 rounded-lg bg-neon-magenta/5 border border-neon-magenta/20 mb-4">
                       <p className="text-white/70 text-xs font-inter mb-2">
                         <span className="text-neon-magenta font-semibold">{selectedSubtopics.length}</span> subtopic{selectedSubtopics.length !== 1 ? 's' : ''} selected
@@ -317,6 +338,12 @@ const TestSetupPage = () => {
                           </span>
                         ))}
                       </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-lg bg-neon-cyan/5 border border-neon-cyan/20 mb-4">
+                      <p className="text-neon-cyan text-xs font-inter">
+                        ✨ No subtopics selected — questions will be drawn from all subtopics in "{topic}".
+                      </p>
                     </div>
                   )}
                 </div>
@@ -330,10 +357,6 @@ const TestSetupPage = () => {
                   variant="magenta" 
                   size="md" 
                   onClick={() => { 
-                    if (subtopics.length > 0 && selectedSubtopics.length === 0) {
-                      setSubtopicsError('Please select at least one subtopic.');
-                      return;
-                    }
                     setStep(3); 
                     setSubtopicsError('');
                   }} 
