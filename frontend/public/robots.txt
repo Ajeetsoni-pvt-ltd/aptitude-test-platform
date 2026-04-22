@@ -33,7 +33,7 @@ Disallow: /solutions/
 Crawl-delay: 1
 
 # Sitemap location
-Sitemap: https://yourdomain.com/sitemap.xml
+Sitemap: https://aptitudetest.site/sitemap.xml
 
 # Additional security directives
 User-agent: *

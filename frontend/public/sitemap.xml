@@ -7,7 +7,7 @@
 
   <!-- HOME / LOGIN PAGE -->
   <url>
-    <loc>https://yourdomain.com/login</loc>
+    <loc>https://aptitudetest.site/login</loc>
     <lastmod>2026-04-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
@@ -15,7 +15,7 @@
 
   <!-- REGISTRATION PAGE -->
   <url>
-    <loc>https://yourdomain.com/register</loc>
+    <loc>https://aptitudetest.site/register</loc>
     <lastmod>2026-04-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
@@ -23,7 +23,7 @@
 
   <!-- USER DASHBOARD -->
   <url>
-    <loc>https://yourdomain.com/dashboard</loc>
+    <loc>https://aptitudetest.site/dashboard</loc>
     <lastmod>2026-04-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
@@ -31,7 +31,7 @@
 
   <!-- TEST SETUP PAGE -->
   <url>
-    <loc>https://yourdomain.com/test-setup</loc>
+    <loc>https://aptitudetest.site/test-setup</loc>
     <lastmod>2026-04-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
@@ -39,7 +39,7 @@
 
   <!-- TEST PAGE -->
   <url>
-    <loc>https://yourdomain.com/test</loc>
+    <loc>https://aptitudetest.site/test</loc>
     <lastmod>2026-04-22</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
@@ -47,7 +47,7 @@
 
   <!-- RESULT PAGE -->
   <url>
-    <loc>https://yourdomain.com/result</loc>
+    <loc>https://aptitudetest.site/result</loc>
     <lastmod>2026-04-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -55,7 +55,7 @@
 
   <!-- ANALYSIS PAGE -->
   <url>
-    <loc>https://yourdomain.com/analysis</loc>
+    <loc>https://aptitudetest.site/analysis</loc>
     <lastmod>2026-04-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
@@ -63,7 +63,7 @@
 
   <!-- PROBLEM OF THE DAY -->
   <url>
-    <loc>https://yourdomain.com/problem-of-day</loc>
+    <loc>https://aptitudetest.site/problem-of-day</loc>
     <lastmod>2026-04-22</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -71,7 +71,7 @@
 
   <!-- HISTORY PAGE -->
   <url>
-    <loc>https://yourdomain.com/history</loc>
+    <loc>https://aptitudetest.site/history</loc>
     <lastmod>2026-04-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.75</priority>
@@ -79,7 +79,7 @@
 
   <!-- LEADERBOARD PAGE -->
   <url>
-    <loc>https://yourdomain.com/leaderboard</loc>
+    <loc>https://aptitudetest.site/leaderboard</loc>
     <lastmod>2026-04-22</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -87,7 +87,7 @@
 
   <!-- SOLUTION REVIEW (Dynamic - Base URL) -->
   <url>
-    <loc>https://yourdomain.com/solutions</loc>
+    <loc>https://aptitudetest.site/solutions</loc>
     <lastmod>2026-04-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.75</priority>
@@ -95,7 +95,7 @@
 
   <!-- PROFILE PAGE -->
   <url>
-    <loc>https://yourdomain.com/profile</loc>
+    <loc>https://aptitudetest.site/profile</loc>
     <lastmod>2026-04-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
@@ -103,7 +103,7 @@
 
   <!-- SETTINGS PAGE -->
   <url>
-    <loc>https://yourdomain.com/settings</loc>
+    <loc>https://aptitudetest.site/settings</loc>
     <lastmod>2026-04-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
@@ -111,7 +111,7 @@
 
   <!-- NOTIFICATIONS PAGE -->
   <url>
-    <loc>https://yourdomain.com/notifications</loc>
+    <loc>https://aptitudetest.site/notifications</loc>
     <lastmod>2026-04-22</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
@@ -119,7 +119,7 @@
 
   <!-- ADMIN DASHBOARD -->
   <url>
-    <loc>https://yourdomain.com/admin</loc>
+    <loc>https://aptitudetest.site/admin</loc>
     <lastmod>2026-04-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.5</priority>
@@ -127,7 +127,7 @@
 
   <!-- ADMIN - UPLOAD QUESTIONS -->
   <url>
-    <loc>https://yourdomain.com/admin/upload</loc>
+    <loc>https://aptitudetest.site/admin/upload</loc>
     <lastmod>2026-04-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
@@ -135,7 +135,7 @@
 
   <!-- ADMIN - QUESTIONS MANAGEMENT -->
   <url>
-    <loc>https://yourdomain.com/admin/questions</loc>
+    <loc>https://aptitudetest.site/admin/questions</loc>
     <lastmod>2026-04-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.5</priority>
@@ -143,7 +143,7 @@
 
   <!-- ADMIN - USERS MANAGEMENT -->
   <url>
-    <loc>https://yourdomain.com/admin/users</loc>
+    <loc>https://aptitudetest.site/admin/users</loc>
     <lastmod>2026-04-22</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.5</priority>
@@ -151,7 +151,7 @@
 
   <!-- ADMIN - CREATE TEST -->
   <url>
-    <loc>https://yourdomain.com/admin/create-test</loc>
+    <loc>https://aptitudetest.site/admin/create-test</loc>
     <lastmod>2026-04-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
@@ -159,7 +159,7 @@
 
   <!-- ADMIN - CREATE FULL LENGTH TEST -->
   <url>
-    <loc>https://yourdomain.com/admin/create-full-length-test</loc>
+    <loc>https://aptitudetest.site/admin/create-full-length-test</loc>
     <lastmod>2026-04-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
@@ -167,7 +167,7 @@
 
   <!-- ADMIN - MANAGE TESTS -->
   <url>
-    <loc>https://yourdomain.com/admin/manage-tests</loc>
+    <loc>https://aptitudetest.site/admin/manage-tests</loc>
     <lastmod>2026-04-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.5</priority>
@@ -175,7 +175,7 @@
 
   <!-- ADMIN - LIVE PROCTORING -->
   <url>
-    <loc>https://yourdomain.com/admin/live-proctoring</loc>
+    <loc>https://aptitudetest.site/admin/live-proctoring</loc>
     <lastmod>2026-04-22</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.5</priority>
