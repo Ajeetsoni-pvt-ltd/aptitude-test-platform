@@ -1,0 +1,43 @@
+# Aptitude Test Platform - robots.txt
+# Allow Google and other search engines to crawl the site
+
+User-agent: *
+Allow: /
+Allow: /login
+Allow: /register
+Allow: /dashboard
+Allow: /test-setup
+Allow: /test
+Allow: /result
+Allow: /analysis
+Allow: /profile
+Allow: /history
+Allow: /leaderboard
+Allow: /problem-of-day
+Allow: /notifications
+Allow: /settings
+
+# Disallow admin pages from search engines (optional - comment out if you want them indexed)
+Disallow: /admin/
+Disallow: /admin/*
+
+# Disallow private/protected routes
+Disallow: /test
+Disallow: /solutions/
+
+# Allow specific admin pages if needed
+# Allow: /admin/
+# Allow: /admin/dashboard
+
+# Crawl delay (in seconds) - be respectful to server
+Crawl-delay: 1
+
+# Sitemap location
+Sitemap: https://yourdomain.com/sitemap.xml
+
+# Additional security directives
+User-agent: *
+Disallow: /api/
+Disallow: *.json$
+Disallow: *.xml$
+Disallow: /*?*
