@@ -1,13 +1,16 @@
 // frontend/src/routes/AppRouter.tsx
 // All Routes — Public, Protected, Admin
 
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import ProtectedRoute from './ProtectedRoute';
 import PublicRoute    from './PublicRoute';
 
 // ── Public pages ──────────────────────────────────────────────────
 import LoginPage    from '@/pages/LoginPage';
 import RegisterPage from '@/pages/RegisterPage';
+import LandingPage  from '@/pages/LandingPage';
+import DemoTestPage   from '@/pages/DemoTestPage';
+import DemoResultPage from '@/pages/DemoResultPage';
 
 // ── Protected user pages ──────────────────────────────────────────
 import DashboardPage     from '@/pages/DashboardPage';
@@ -41,8 +44,12 @@ const AppRouter = () => {
   return (
     <Routes>
 
-      {/* ── Default redirect ──────────────────────────────────── */}
-      <Route path="/" element={<Navigate to="/login" replace />} />
+      {/* ── Landing page ──────────────────────────────────────── */}
+      <Route path="/" element={<LandingPage />} />
+
+      {/* ── Demo Routes (no auth required) ─────────────────────── */}
+      <Route path="/demo"        element={<DemoTestPage />} />
+      <Route path="/demo/result" element={<DemoResultPage />} />
 
       {/* ── Public Routes (redirect if already logged in) ──────── */}
       <Route element={<PublicRoute />}>
