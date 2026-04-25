@@ -353,7 +353,7 @@ const DashboardPage = () => {
       </div>
 
       {/* ── Problem of the Day Card ─────────────────────────── */}
-      <PotdCard navigate={navigate} userId={user?._id ?? user?.id ?? ''} />
+      <PotdCard navigate={navigate} userId={user?._id ?? ''} />
 
       {/* ── Scheduled / Upcoming Tests ─────────────────────── */}
       {scheduledTests.length > 0 && (

@@ -48,7 +48,7 @@ const Sidebar = ({ isMobile, onClose }: SidebarProps) => {
   const { user, logout }          = useAuthStore();
   const navigate                  = useNavigate();
   const location                  = useLocation();
-  const streak                    = getStreakCount(user?._id ?? user?.id ?? '');
+  const streak                    = getStreakCount(user?._id ?? '');
 
   useEffect(() => {
     if (user) {

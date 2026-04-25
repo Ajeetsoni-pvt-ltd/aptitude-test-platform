@@ -22,39 +22,27 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          // Core React — cached separately
-          'vendor-react': ['react', 'react-dom'],
-
-          // Router — cached separately
-          'vendor-router': ['react-router-dom'],
-
-          // Landing page + heavy shader — separate chunk
-          // loads only when user visits "/"
-          'chunk-landing': [
-            './src/pages/LandingPage',
-            './src/components/ui/animated-shader-hero',
-            './src/components/landing/Navbar',
-            './src/components/landing/AboutSection',
-            './src/components/landing/FeaturesSection',
-            './src/components/landing/Footer',
-          ],
-
-          // Demo test — separate chunk
-          // loads only when user visits "/demo"
-          'chunk-demo': [
-            './src/pages/DemoTestPage',
-            './src/pages/DemoResultPage',
-          ],
+        manualChunks: (id) => {
+          if (id.includes('node_modules/react')) {
+            return 'vendor-react';
+          }
+          if (id.includes('node_modules/react-router-dom')) {
+            return 'vendor-router';
+          }
+          if (id.includes('LandingPage') || id.includes('animated-shader-hero')) {
+            return 'chunk-landing';
+          }
+          if (id.includes('DemoTestPage') || id.includes('DemoResultPage')) {
+            return 'chunk-demo';
+          }
         },
       },
     },
     chunkSizeWarningLimit: 600,
-    // Minify aggressively
     minify: 'terser',
     terserOptions: {
       compress: {
-        drop_console: true,   // removes console.log in production
+        drop_console: true,
         drop_debugger: true,
       },
     },
