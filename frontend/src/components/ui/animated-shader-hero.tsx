@@ -57,7 +57,8 @@ void main(){gl_Position=position;}`;
       this.canvas = canvas;
       this.scale = scale;
       this.gl = canvas.getContext('webgl2')!;
-      this.gl.viewport(0, 0, canvas.width * scale, canvas.height * scale);
+      // Use canvas pixel dimensions directly (already includes DPR)
+      this.gl.viewport(0, 0, canvas.width, canvas.height);
       this.shaderSource = defaultShaderSource;
     }
 
@@ -86,7 +87,8 @@ void main(){gl_Position=position;}`;
 
     updateScale(scale: number) {
       this.scale = scale;
-      this.gl.viewport(0, 0, this.canvas.width * scale, this.canvas.height * scale);
+      // Use canvas pixel dimensions directly (already includes DPR)
+      this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     }
 
     compile(shader: WebGLShader, source: string) {
@@ -258,21 +260,50 @@ void main(){gl_Position=position;}`;
 
   const resize = () => {
     if (!canvasRef.current) return;
-    
     const canvas = canvasRef.current;
-    const dpr = Math.max(1, 0.5 * window.devicePixelRatio);
-    
-    canvas.width = window.innerWidth * dpr;
+
+    // CSS size = always full viewport (visual size on screen)
+    canvas.style.width  = '100vw';
+    canvas.style.height = '100vh';
+
+    // Detect slow network or low-end device
+    const connection = (navigator as any).connection;
+    const isSlowDevice =
+      connection &&
+      (connection.effectiveType === '2g' ||
+        connection.effectiveType === 'slow-2g' ||
+        connection.saveData === true);
+
+    // DPR controls render resolution (quality), NOT visual size
+    const dpr = isSlowDevice
+      ? 0.5
+      : Math.min(1.0, 0.5 * window.devicePixelRatio);
+
+    // Pixel buffer size (can be lower than CSS size for performance)
+    canvas.width  = window.innerWidth  * dpr;
     canvas.height = window.innerHeight * dpr;
-    
+
+    // MUST update WebGL viewport to match new pixel dimensions
     if (rendererRef.current) {
       rendererRef.current.updateScale(dpr);
     }
   };
 
+  // Throttle to 30fps
+  let lastFrameTime = 0;
+  const TARGET_FPS = 30;
+  const FRAME_INTERVAL = 1000 / TARGET_FPS;
+
   const loop = (now: number) => {
     if (!rendererRef.current || !pointersRef.current) return;
-    
+
+    // Throttle to 30fps
+    if (now - lastFrameTime < FRAME_INTERVAL) {
+      animationFrameRef.current = requestAnimationFrame(loop);
+      return;
+    }
+    lastFrameTime = now;
+
     rendererRef.current.updateMouse(pointersRef.current.first);
     rendererRef.current.updatePointerCount(pointersRef.current.count);
     rendererRef.current.updatePointerCoords(pointersRef.current.coords);
@@ -285,14 +316,24 @@ void main(){gl_Position=position;}`;
     if (!canvasRef.current) return;
 
     const canvas = canvasRef.current;
-    const dpr = Math.max(1, 0.5 * window.devicePixelRatio);
-    
+
+    // Set CSS size FIRST before anything else
+    canvas.style.width  = '100vw';
+    canvas.style.height = '100vh';
+
+    const dpr = Math.min(1.0, 0.5 * window.devicePixelRatio);
+
+    // Set pixel buffer before creating renderer
+    canvas.width  = window.innerWidth  * dpr;
+    canvas.height = window.innerHeight * dpr;
+
     rendererRef.current = new WebGLRenderer(canvas, dpr);
     pointersRef.current = new PointerHandler(canvas, dpr);
-    
+
     rendererRef.current.setup();
     rendererRef.current.init();
-    
+
+    // Call resize AFTER renderer is ready
     resize();
     
     if (rendererRef.current.test(defaultShaderSource) === null) {
@@ -302,9 +343,40 @@ void main(){gl_Position=position;}`;
     loop(0);
     
     window.addEventListener('resize', resize);
-    
+
+    // Pause animation when user switches tabs
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+        }
+      } else {
+        animationFrameRef.current = requestAnimationFrame(loop);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Pause WebGL when hero is not in viewport
+    const intersectionObserver = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) {
+          if (animationFrameRef.current) {
+            cancelAnimationFrame(animationFrameRef.current);
+          }
+        } else {
+          animationFrameRef.current = requestAnimationFrame(loop);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (canvas) intersectionObserver.observe(canvas);
+
     return () => {
       window.removeEventListener('resize', resize);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      intersectionObserver.disconnect();
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
@@ -391,7 +463,7 @@ const Hero: React.FC<HeroProps> = ({
       
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 w-full h-full object-contain touch-none"
+        className="absolute inset-0 w-full h-full object-cover touch-none"
         style={{ background: 'black' }}
       />
       

@@ -1,7 +1,8 @@
 // src/pages/ProblemOfDayPage.tsx
 // Enhanced Daily Challenges — calendar, history, 3-question sets, stats
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useAuthStore } from '@/store/authStore';
 import { useNavigate } from 'react-router-dom';
 import AppLayout from '@/components/layout/AppLayout';
 import NeonCard from '@/components/ui/NeonCard';
@@ -48,6 +49,10 @@ interface DailyRecord {
 
 // ─── Utilities ────────────────────────────────────────────────
 const getTodayKey = () => new Date().toISOString().split('T')[0];
+
+// ─── User-scoped localStorage keys ───────────────────────────
+// Each user gets their own streak/history data
+const podKey = (userId: string, suffix: string) => `potd_${suffix}_${userId}`;
 
 const getDailySet = (date: string): typeof QUESTION_POOL => {
   // Seed by date so same 3 questions per day
@@ -100,22 +105,58 @@ const ParticleBurst = ({ active }: { active: boolean }) => {
 // ─── Main Page ────────────────────────────────────────────────
 const ProblemOfDayPage = () => {
   const navigate  = useNavigate();
+  const { user }  = useAuthStore();
+  const userId    = user?._id ?? user?.id ?? '';
   const todayKey  = getTodayKey();
   const dailySet  = getDailySet(todayKey);
+  const migrated  = useRef(false);
 
   const [tab, setTab] = useState<'today' | 'history' | 'stats'>('today');
   const [activeQ, setActiveQ] = useState(0); // which of the 3 questions
 
-  // ── Persisted state ────────────────────────────────────────
-  const [streak,     setStreak]   = useState(() => parseInt(localStorage.getItem('potd_streak') ?? '0'));
-  const [bestStreak, setBestStreak] = useState(() => parseInt(localStorage.getItem('potd_best') ?? '0'));
-  const [history,    setHistory]  = useState<DailyRecord[]>(() => {
-    try { return JSON.parse(localStorage.getItem('potd_history') ?? '[]'); } catch { return []; }
-  });
+  // ── Persisted state (user-scoped) ──────────────────────────
+  const [streak,     setStreak]   = useState(0);
+  const [bestStreak, setBestStreak] = useState(0);
+  const [history,    setHistory]  = useState<DailyRecord[]>([]);
   const [selected, setSelected]   = useState<(number | null)[]>([null, null, null]);
   const [submitted, setSubmitted] = useState<boolean[]>([false, false, false]);
   const [showReward, setShowReward] = useState(false);
   const [timeLeft,   setTimeLeft] = useState(0);
+
+  // ── Load user-scoped data + migrate old global keys ────────
+  useEffect(() => {
+    if (!userId || migrated.current) return;
+    migrated.current = true;
+
+    // One-time migration: old global keys → user-scoped keys
+    const oldStreak  = localStorage.getItem('potd_streak');
+    const oldBest    = localStorage.getItem('potd_best');
+    const oldHistory = localStorage.getItem('potd_history');
+
+    if (oldStreak !== null && localStorage.getItem(podKey(userId, 'streak')) === null) {
+      localStorage.setItem(podKey(userId, 'streak'), oldStreak);
+    }
+    if (oldBest !== null && localStorage.getItem(podKey(userId, 'best')) === null) {
+      localStorage.setItem(podKey(userId, 'best'), oldBest);
+    }
+    if (oldHistory !== null && localStorage.getItem(podKey(userId, 'history')) === null) {
+      localStorage.setItem(podKey(userId, 'history'), oldHistory);
+    }
+
+    // Clean up old global keys after migration
+    localStorage.removeItem('potd_streak');
+    localStorage.removeItem('potd_best');
+    localStorage.removeItem('potd_history');
+
+    // Load user-scoped data
+    setStreak(parseInt(localStorage.getItem(podKey(userId, 'streak')) ?? '0'));
+    setBestStreak(parseInt(localStorage.getItem(podKey(userId, 'best')) ?? '0'));
+    try {
+      setHistory(JSON.parse(localStorage.getItem(podKey(userId, 'history')) ?? '[]'));
+    } catch {
+      setHistory([]);
+    }
+  }, [userId]);
 
   const todayRecord = history.find((h) => h.date === todayKey);
   const allDone     = submitted.every(Boolean);
@@ -170,8 +211,8 @@ const ProblemOfDayPage = () => {
       setStreak(newStreak);
       const newBest = Math.max(newStreak, bestStreak);
       setBestStreak(newBest);
-      localStorage.setItem('potd_streak', String(newStreak));
-      localStorage.setItem('potd_best',   String(newBest));
+      localStorage.setItem(podKey(userId, 'streak'), String(newStreak));
+      localStorage.setItem(podKey(userId, 'best'),   String(newBest));
 
       // Save to history
       const record: DailyRecord = {
@@ -186,7 +227,7 @@ const ProblemOfDayPage = () => {
       };
       const newHistory = [...history.filter((h) => h.date !== todayKey), record];
       setHistory(newHistory);
-      localStorage.setItem('potd_history', JSON.stringify(newHistory));
+      localStorage.setItem(podKey(userId, 'history'), JSON.stringify(newHistory));
 
       if (score >= 2) {
         setShowReward(true);
