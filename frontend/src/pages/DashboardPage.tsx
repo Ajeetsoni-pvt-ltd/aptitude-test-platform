@@ -72,8 +72,8 @@ const QuickAction = ({
 );
 
 // ── Problem of the Day mini-card for dashboard ────────────────────
-const PotdCard = ({ navigate }: { navigate: (to: string) => void }) => {
-  const streak     = parseInt(localStorage.getItem('potd_streak') ?? '0');
+const PotdCard = ({ navigate, userId }: { navigate: (to: string) => void; userId: string }) => {
+  const streak     = parseInt(localStorage.getItem(`potd_streak_${userId}`) ?? '0');
   const solvedToday = localStorage.getItem('potd_solved_date') === new Date().toISOString().split('T')[0];
   return (
     <NeonCard variant="amber" className="mb-6 animate-fade-up" padding="p-4">
@@ -353,7 +353,7 @@ const DashboardPage = () => {
       </div>
 
       {/* ── Problem of the Day Card ─────────────────────────── */}
-      <PotdCard navigate={navigate} />
+      <PotdCard navigate={navigate} userId={user?._id ?? user?.id ?? ''} />
 
       {/* ── Scheduled / Upcoming Tests ─────────────────────── */}
       {scheduledTests.length > 0 && (
