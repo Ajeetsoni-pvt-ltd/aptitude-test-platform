@@ -106,7 +106,7 @@ const ParticleBurst = ({ active }: { active: boolean }) => {
 const ProblemOfDayPage = () => {
   const navigate  = useNavigate();
   const { user }  = useAuthStore();
-  const userId    = user?._id ?? user?.id ?? '';
+  const userId    = user?._id ?? '';
   const todayKey  = getTodayKey();
   const dailySet  = getDailySet(todayKey);
   const migrated  = useRef(false);
