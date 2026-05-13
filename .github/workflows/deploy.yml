@@ -57,6 +57,8 @@ jobs:
           push: true
           tags: ${{ steps.frontend-meta.outputs.tags }}
           labels: ${{ steps.frontend-meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           build-args: |
             VITE_API_BASE_URL=/api
 
@@ -68,6 +70,8 @@ jobs:
           push: true
           tags: ${{ steps.backend-meta.outputs.tags }}
           labels: ${{ steps.backend-meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   deploy:
     needs: docker
@@ -75,7 +79,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy to VPS with Docker Compose
+      - name: Deploy to VPS (Zero-Downtime)
         uses: appleboy/ssh-action@v1.2.0
         env:
           GHCR_OWNER: ${{ github.repository_owner }}
@@ -87,13 +91,51 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT }}
           envs: GHCR_OWNER,GHCR_USERNAME,GHCR_PAT
+          command_timeout: 10m
           script: |
             set -e
-            cd /opt/aptitude-test-platform
+
+            APP_DIR="/opt/aptitude-test-platform"
+            cd "$APP_DIR"
+
+            echo "──── 1. Pull latest code ────"
             git fetch origin
             git checkout main
             git reset --hard origin/main
+
+            echo "──── 2. Login to GHCR ────"
             echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
-            GHCR_OWNER="$GHCR_OWNER" IMAGE_TAG=latest docker compose -f docker-compose.prod.yml pull
-            GHCR_OWNER="$GHCR_OWNER" IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+            echo "──── 3. Pull new images ────"
+            GHCR_OWNER="$GHCR_OWNER" IMAGE_TAG=latest \
+              docker compose -f docker-compose.prod.yml pull
+
+            echo "──── 4. Rolling restart (zero-downtime) ────"
+            # Restart backend first, wait for health check, then frontend
+            GHCR_OWNER="$GHCR_OWNER" IMAGE_TAG=latest \
+              docker compose -f docker-compose.prod.yml up -d --no-deps --remove-orphans backend
+
+            # Wait for backend health check to pass
+            echo "  Waiting for backend health..."
+            for i in $(seq 1 30); do
+              if docker exec aptitude_backend node -e "fetch('http://localhost:5000/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))" 2>/dev/null; then
+                echo "  ✅ Backend healthy after ${i}s"
+                break
+              fi
+              if [ "$i" -eq 30 ]; then
+                echo "  ❌ Backend health check failed — rolling back"
+                docker compose -f docker-compose.prod.yml logs --tail=50 backend
+                exit 1
+              fi
+              sleep 1
+            done
+
+            # Now update frontend and proxy
+            GHCR_OWNER="$GHCR_OWNER" IMAGE_TAG=latest \
+              docker compose -f docker-compose.prod.yml up -d --no-deps frontend proxy
+
+            echo "──── 5. Cleanup ────"
             docker image prune -f
+
+            echo "──── ✅ Deployment complete ────"
+            docker compose -f docker-compose.prod.yml ps
