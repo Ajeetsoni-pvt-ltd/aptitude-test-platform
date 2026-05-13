@@ -6,6 +6,7 @@ export interface User {
   branch: string;
   section: string;
   role: 'student' | 'admin';
+  isVerified?: boolean;
   createdAt?: string;
 }
 
@@ -16,6 +17,20 @@ export interface AuthResponse {
     token: string;
     user: User;
   };
+}
+
+// Signup response — no token, just success message
+export interface SignupResponse {
+  success: boolean;
+  message: string;
+  data: null;
+}
+
+// Generic message response (verify, resend, forgot password)
+export interface MessageResponse {
+  success: boolean;
+  message: string;
+  data: null;
 }
 
 export interface ApiResponse<T> {

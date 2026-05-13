@@ -6,11 +6,14 @@ import ProtectedRoute from './ProtectedRoute';
 import PublicRoute    from './PublicRoute';
 
 // ── Public pages ──────────────────────────────────────────────────
-import LoginPage    from '@/pages/LoginPage';
-import RegisterPage from '@/pages/RegisterPage';
-import LandingPage  from '@/pages/LandingPage';
-import DemoTestPage   from '@/pages/DemoTestPage';
-import DemoResultPage from '@/pages/DemoResultPage';
+import LoginPage         from '@/pages/LoginPage';
+import RegisterPage      from '@/pages/RegisterPage';
+import LandingPage       from '@/pages/LandingPage';
+import DemoTestPage      from '@/pages/DemoTestPage';
+import DemoResultPage    from '@/pages/DemoResultPage';
+import VerifyEmailPage   from '@/pages/VerifyEmailPage';
+import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
+import ResetPasswordPage from '@/pages/ResetPasswordPage';
 
 // ── Protected user pages ──────────────────────────────────────────
 import DashboardPage     from '@/pages/DashboardPage';
@@ -50,6 +53,11 @@ const AppRouter = () => {
       {/* ── Demo Routes (no auth required) ─────────────────────── */}
       <Route path="/demo"        element={<DemoTestPage />} />
       <Route path="/demo/result" element={<DemoResultPage />} />
+
+      {/* ── Email Verification & Password Reset (always public) ── */}
+      <Route path="/verify-email"    element={<VerifyEmailPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password"  element={<ResetPasswordPage />} />
 
       {/* ── Public Routes (redirect if already logged in) ──────── */}
       <Route element={<PublicRoute />}>

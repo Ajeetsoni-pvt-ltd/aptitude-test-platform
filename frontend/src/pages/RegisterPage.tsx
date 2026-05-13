@@ -1,13 +1,20 @@
+// src/pages/RegisterPage.tsx
+// ─────────────────────────────────────────────────────────────
+// Registration Page — Updated for Email Verification Flow
+// After signup → shows "Check your email" success screen
+// Includes resend verification option
+// ─────────────────────────────────────────────────────────────
+
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
+import { resendVerificationApi } from '@/api/authApi';
 import HoloButton from '@/components/ui/HoloButton';
 import CyberInput from '@/components/ui/CyberInput';
-import { Mail, Lock, User, Eye, EyeOff, Zap, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, Zap, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
 
 const RegisterPage = () => {
-  const navigate = useNavigate();
-  const { register, isLoading, error, clearError } = useAuthStore();
+  const { register, isLoading, error, clearError, registrationSuccess, registrationEmail, clearRegistration } = useAuthStore();
 
   const [formData, setFormData] = useState({
     name: '',
@@ -29,7 +36,11 @@ const RegisterPage = () => {
   });
   const [showPass, setShowPass] = useState(false);
   const [showConf, setShowConf] = useState(false);
-  const [success, setSuccess] = useState(false);
+
+  // Resend verification state
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendMessage, setResendMessage] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -70,10 +81,26 @@ const RegisterPage = () => {
       errors.section = 'Section is required.';
       valid = false;
     }
-    if (formData.password.length < 6) {
-      errors.password = 'Minimum 6 characters.';
+
+    // Strong password validation
+    const p = formData.password;
+    if (p.length < 8) {
+      errors.password = 'Minimum 8 characters.';
+      valid = false;
+    } else if (!/[A-Z]/.test(p)) {
+      errors.password = 'Must contain an uppercase letter.';
+      valid = false;
+    } else if (!/[a-z]/.test(p)) {
+      errors.password = 'Must contain a lowercase letter.';
+      valid = false;
+    } else if (!/[0-9]/.test(p)) {
+      errors.password = 'Must contain a number.';
+      valid = false;
+    } else if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(p)) {
+      errors.password = 'Must contain a special character.';
       valid = false;
     }
+
     if (formData.password !== formData.confirmPassword) {
       errors.confirmPassword = 'Passwords do not match.';
       valid = false;
@@ -96,10 +123,35 @@ const RegisterPage = () => {
         branch: formData.branch.trim(),
         section: formData.section.trim(),
       });
-      setSuccess(true);
-      setTimeout(() => navigate('/dashboard', { replace: true }), 1200);
+      // registrationSuccess will be set by the store
     } catch {
       // store handles visible error state
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!registrationEmail || resendCooldown > 0) return;
+
+    setResendLoading(true);
+    setResendMessage('');
+    try {
+      const res = await resendVerificationApi(registrationEmail);
+      setResendMessage(res.message);
+      // Start 60s cooldown
+      setResendCooldown(60);
+      const interval = setInterval(() => {
+        setResendCooldown((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } catch {
+      setResendMessage('Failed to resend email. Please try again.');
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -107,8 +159,8 @@ const RegisterPage = () => {
     const p = formData.password;
     if (!p) return 0;
     let s = 0;
-    if (p.length >= 6) s++;
-    if (p.length >= 10) s++;
+    if (p.length >= 8) s++;
+    if (p.length >= 12) s++;
     if (/[A-Z]/.test(p)) s++;
     if (/[0-9]/.test(p)) s++;
     if (/[^A-Za-z0-9]/.test(p)) s++;
@@ -116,8 +168,102 @@ const RegisterPage = () => {
   })();
 
   const strengthColors = ['', '#FF3366', '#FFB700', '#FFB700', '#00FF88', '#00FF88'];
-  const strengthLabels = ['', 'Weak', 'Fair', 'Good', 'Strong', 'Neural-grade'];
+  const strengthLabels = ['', 'Weak', 'Fair', 'Good', 'Strong', 'Excellent'];
 
+  // ─── Post-Signup Success Screen ─────────────────────────────
+  if (registrationSuccess) {
+    return (
+      <div className="min-h-screen bg-cyber-black relative flex items-center justify-center p-4 overflow-hidden">
+        <div className="pointer-events-none absolute inset-0">
+          <div
+            className="absolute top-[-10%] right-[-5%] w-[450px] h-[450px] rounded-full opacity-[0.10]"
+            style={{ background: 'radial-gradient(circle, #00FF88, transparent 65%)' }}
+          />
+          <div
+            className="absolute bottom-[-10%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-[0.08]"
+            style={{ background: 'radial-gradient(circle, #9D00FF, transparent 65%)' }}
+          />
+          <div className="absolute inset-0 cyber-grid opacity-40" />
+        </div>
+
+        <div className="relative z-10 w-full max-w-md animate-fade-up">
+          <div className="glass-strong rounded-2xl border border-white/8 shadow-glass-strong overflow-hidden">
+            <div
+              className="h-0.5 w-full"
+              style={{ background: 'linear-gradient(90deg, #00FF88, #00CCAA, #9D00FF)' }}
+            />
+
+            <div className="p-8 text-center">
+              {/* Success Icon */}
+              <div
+                className="inline-flex items-center justify-center w-20 h-20 rounded-full mb-6
+                bg-gradient-to-br from-neon-green/15 to-neon-green/5
+                border border-neon-green/30 shadow-[0_0_40px_rgba(0,255,136,0.2)]
+                animate-float"
+              >
+                <Mail size={32} className="text-neon-green" />
+              </div>
+
+              <h1 className="font-orbitron text-2xl font-bold text-white tracking-wider mb-3">
+                CHECK YOUR EMAIL
+              </h1>
+              <p className="text-white/50 text-sm font-inter mb-2 leading-relaxed">
+                We&apos;ve sent a verification link to
+              </p>
+              <p className="text-neon-green font-inter font-semibold text-base mb-6">
+                {registrationEmail}
+              </p>
+
+              <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06] mb-6 text-left">
+                <p className="text-white/40 text-sm font-inter leading-relaxed">
+                  📧 Click the link in the email to verify your account.
+                  <br />
+                  ⏱ The link expires in <strong className="text-white/60">30 minutes</strong>.
+                  <br />
+                  📥 Check your spam folder if you don&apos;t see it.
+                </p>
+              </div>
+
+              {/* Resend Verification */}
+              <div className="mb-6">
+                <button
+                  onClick={handleResendVerification}
+                  disabled={resendLoading || resendCooldown > 0}
+                  className="inline-flex items-center gap-2 text-sm font-inter text-neon-violet hover:text-neon-violet/80
+                    transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <RefreshCw size={14} className={resendLoading ? 'animate-spin' : ''} />
+                  {resendCooldown > 0
+                    ? `Resend in ${resendCooldown}s`
+                    : resendLoading
+                      ? 'Sending...'
+                      : 'Resend verification email'}
+                </button>
+                {resendMessage && (
+                  <p className="text-white/40 text-xs mt-2 font-inter">{resendMessage}</p>
+                )}
+              </div>
+
+              {/* Login Link */}
+              <Link
+                to="/login"
+                onClick={() => clearRegistration()}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl
+                  bg-gradient-to-r from-neon-cyan/10 to-neon-violet/10
+                  border border-white/10 hover:border-neon-cyan/30
+                  text-white font-inter text-sm font-medium
+                  transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,245,255,0.1)]"
+              >
+                Go to Login →
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Registration Form ──────────────────────────────────────
   return (
     <div className="min-h-screen bg-cyber-black relative flex items-center justify-center p-4 overflow-hidden">
       <div className="pointer-events-none absolute inset-0">
@@ -166,16 +312,7 @@ const RegisterPage = () => {
               Initialize your neural profile
             </p>
 
-            {success && (
-              <div className="mb-5 flex items-center gap-3 p-3.5 rounded-xl bg-neon-green/8 border border-neon-green/25 animate-fade-in">
-                <CheckCircle2 size={16} className="text-neon-green flex-shrink-0" />
-                <p className="text-neon-green text-sm font-inter">
-                  Identity verified! Entering NEXUS...
-                </p>
-              </div>
-            )}
-
-            {error && !success && (
+            {error && (
               <div className="mb-5 flex items-start gap-3 p-3.5 rounded-xl bg-neon-red/8 border border-neon-red/25 animate-fade-in">
                 <AlertCircle size={16} className="text-neon-red flex-shrink-0 mt-0.5" />
                 <p className="text-neon-red text-sm font-inter">{error}</p>
@@ -191,7 +328,7 @@ const RegisterPage = () => {
                 placeholder="Agent Name"
                 value={formData.name}
                 onChange={handleChange}
-                disabled={isLoading || success}
+                disabled={isLoading}
                 error={formErrors.name}
                 icon={<User size={15} />}
               />
@@ -204,7 +341,7 @@ const RegisterPage = () => {
                 placeholder="agent@nexus.io"
                 value={formData.email}
                 onChange={handleChange}
-                disabled={isLoading || success}
+                disabled={isLoading}
                 error={formErrors.email}
                 icon={<Mail size={15} />}
               />
@@ -217,7 +354,7 @@ const RegisterPage = () => {
                 placeholder="Your college"
                 value={formData.collegeName}
                 onChange={handleChange}
-                disabled={isLoading || success}
+                disabled={isLoading}
                 error={formErrors.collegeName}
                 icon={<User size={15} />}
               />
@@ -231,7 +368,7 @@ const RegisterPage = () => {
                   placeholder="CSE"
                   value={formData.branch}
                   onChange={handleChange}
-                  disabled={isLoading || success}
+                  disabled={isLoading}
                   error={formErrors.branch}
                   icon={<User size={15} />}
                 />
@@ -244,7 +381,7 @@ const RegisterPage = () => {
                   placeholder="A"
                   value={formData.section}
                   onChange={handleChange}
-                  disabled={isLoading || success}
+                  disabled={isLoading}
                   error={formErrors.section}
                   icon={<User size={15} />}
                 />
@@ -256,10 +393,10 @@ const RegisterPage = () => {
                   id="password"
                   name="password"
                   type={showPass ? 'text' : 'password'}
-                  placeholder="Min 6 characters"
+                  placeholder="Min 8 chars, Aa1@"
                   value={formData.password}
                   onChange={handleChange}
-                  disabled={isLoading || success}
+                  disabled={isLoading}
                   error={formErrors.password}
                   icon={<Lock size={15} />}
                   rightIcon={
@@ -273,27 +410,46 @@ const RegisterPage = () => {
                   }
                 />
                 {formData.password && (
-                  <div className="flex items-center gap-2 mt-1.5">
-                    <div className="flex gap-1 flex-1">
-                      {[1, 2, 3, 4, 5].map((i) => (
-                        <div
-                          key={i}
-                          className="h-1 flex-1 rounded-full transition-all duration-300"
-                          style={{
-                            background:
-                              pwStrength >= i
-                                ? strengthColors[pwStrength]
-                                : 'rgba(255,255,255,0.1)',
-                          }}
-                        />
-                      ))}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <div className="flex gap-1 flex-1">
+                        {[1, 2, 3, 4, 5].map((i) => (
+                          <div
+                            key={i}
+                            className="h-1 flex-1 rounded-full transition-all duration-300"
+                            style={{
+                              background:
+                                pwStrength >= i
+                                  ? strengthColors[pwStrength]
+                                  : 'rgba(255,255,255,0.1)',
+                            }}
+                          />
+                        ))}
+                      </div>
+                      <span
+                        className="text-[11px] font-inter"
+                        style={{ color: strengthColors[pwStrength] }}
+                      >
+                        {strengthLabels[pwStrength]}
+                      </span>
                     </div>
-                    <span
-                      className="text-[11px] font-inter"
-                      style={{ color: strengthColors[pwStrength] }}
-                    >
-                      {strengthLabels[pwStrength]}
-                    </span>
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] font-inter text-white/25">
+                      <span className={/[A-Z]/.test(formData.password) ? 'text-neon-green/70' : ''}>
+                        {/[A-Z]/.test(formData.password) ? '✓' : '○'} Uppercase
+                      </span>
+                      <span className={/[a-z]/.test(formData.password) ? 'text-neon-green/70' : ''}>
+                        {/[a-z]/.test(formData.password) ? '✓' : '○'} Lowercase
+                      </span>
+                      <span className={/[0-9]/.test(formData.password) ? 'text-neon-green/70' : ''}>
+                        {/[0-9]/.test(formData.password) ? '✓' : '○'} Number
+                      </span>
+                      <span className={/[^A-Za-z0-9]/.test(formData.password) ? 'text-neon-green/70' : ''}>
+                        {/[^A-Za-z0-9]/.test(formData.password) ? '✓' : '○'} Special
+                      </span>
+                      <span className={formData.password.length >= 8 ? 'text-neon-green/70' : ''}>
+                        {formData.password.length >= 8 ? '✓' : '○'} 8+ chars
+                      </span>
+                    </div>
                   </div>
                 )}
               </div>
@@ -306,7 +462,7 @@ const RegisterPage = () => {
                 placeholder="Re-enter password"
                 value={formData.confirmPassword}
                 onChange={handleChange}
-                disabled={isLoading || success}
+                disabled={isLoading}
                 error={formErrors.confirmPassword}
                 icon={<Lock size={15} />}
                 rightIcon={
@@ -325,7 +481,7 @@ const RegisterPage = () => {
                 variant="violet"
                 size="lg"
                 fullWidth
-                loading={isLoading || success}
+                loading={isLoading}
                 className="mt-3 font-orbitron tracking-widest"
               >
                 REGISTER IDENTITY
