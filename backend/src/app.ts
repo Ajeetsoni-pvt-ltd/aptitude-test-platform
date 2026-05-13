@@ -1,15 +1,14 @@
 // backend/src/app.ts
 // ─────────────────────────────────────────────────────────────
-// Express Application Configuration
-// app.ts = middleware + routes setup (server start NAHI hota yahan)
-// Reason: Testing ke liye app ko server se alag rakhte hain
+// Express Application Configuration — Production Hardened
 // ─────────────────────────────────────────────────────────────
 import errorHandler from './middlewares/errorHandler';
-import express, { Application, Request, Response, NextFunction } from 'express';
+import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
+import mongoSanitize from 'express-mongo-sanitize';
 import path from 'path';
 import authRoutes from './routes/authRoutes';
 import userRoutes from './routes/userRoutes';
@@ -19,24 +18,41 @@ import adminRoutes from './routes/adminRoutes';
 import scheduledTestRoutes from './routes/scheduledTestRoutes';
 import notificationRoutes from './routes/notificationRoutes';
 import aiRoutes from './routes/aiRoutes';
+
 const app: Application = express();
+const isProduction = process.env.NODE_ENV === 'production';
+
+// ─── Trust Proxy (REQUIRED for Docker/Nginx) ──────────────────
+// Nginx sets X-Forwarded-For, X-Forwarded-Proto headers.
+// Without this: rate limiter sees Nginx IP (not client IP),
+// req.protocol is always 'http', secure cookies won't set.
+app.set('trust proxy', 1);
 
 // ─── Security Middleware ───────────────────────────────────────
-// helmet: Sets secure HTTP response headers (XSS, clickjacking protection)
-app.use(helmet());
+app.use(helmet({
+  // Allow inline styles for email templates preview (dev only)
+  contentSecurityPolicy: isProduction ? undefined : false,
+  // HSTS: tell browsers to always use HTTPS (production only)
+  hsts: isProduction ? { maxAge: 31536000, includeSubDomains: true } : false,
+}));
 
-// cors: Allow requests from React frontend
-const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173')
-  .split(',')
-  .map((o) => o.trim());
+// ─── CORS Configuration ───────────────────────────────────────
+// Production: uses CORS_ORIGINS or CLIENT_URL from .env.production
+// Development: falls back to localhost
+const allowedOrigins = (
+  process.env.CORS_ORIGINS ||
+  process.env.CLIENT_URL ||
+  'http://localhost:5173'
+).split(',').map((o) => o.trim());
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (e.g. mobile apps, curl, Postman)
+      // Allow requests with no origin (e.g. mobile apps, curl, health checks)
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
+        console.warn(`[cors:blocked] origin=${origin}`);
         callback(new Error(`CORS: origin ${origin} not allowed`));
       }
     },
@@ -45,33 +61,38 @@ app.use(
   })
 );
 
-// ─── Rate Limiting ─────────────────────────────────────────────
-// Prevent brute-force attacks: max 100 requests per 15 minutes per IP
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,
+// ─── Global Rate Limiting ─────────────────────────────────────
+// Per-endpoint limiters are in middlewares/rateLimiter.ts
+// This is a global safety net: 200 req/15min per IP
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isProduction ? 200 : 1000, // Stricter in production
   standardHeaders: true,
   legacyHeaders: false,
+  // Skip rate limiting for health checks
+  skip: (req) => req.path === '/health',
   message: {
     success: false,
-    message: 'Too many requests from this IP, please try again after 15 minutes.',
+    message: 'Too many requests from this IP, please try again later.',
+    data: null,
   },
 });
-app.use('/api', limiter); // Only apply to /api routes
+app.use('/api', globalLimiter);
 
-// ─── Request Parsing Middleware ────────────────────────────────
-app.use(express.json({ limit: '10mb' }));           // Parse JSON body
-app.use(express.urlencoded({ extended: true }));    // Parse URL-encoded body
+// ─── Request Parsing ──────────────────────────────────────────
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(mongoSanitize()); // Prevent NoSQL injection { "$gt": "" }
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
-// ─── HTTP Request Logger ───────────────────────────────────────
-// morgan 'dev' mode: coloured logs in terminal → [GET] /api/auth/login 200 12ms
+// ─── HTTP Request Logger ──────────────────────────────────────
+// Production: 'combined' format (Apache-style, good for log aggregation)
+// Development: 'dev' format (coloured, concise)
 if (process.env.NODE_ENV !== 'test') {
-  app.use(morgan('dev'));
+  app.use(morgan(isProduction ? 'combined' : 'dev'));
 }
 
-// ─── Health Check Route ────────────────────────────────────────
-// Simple route to verify server is running (used by DevOps/monitoring tools)
+// ─── Health Check ─────────────────────────────────────────────
 app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({
     success: true,
@@ -81,19 +102,17 @@ app.get('/health', (_req: Request, res: Response) => {
   });
 });
 
-// ─── API Routes ────────────────────────────────────────────────
-app.use('/api/auth', authRoutes);                    // ✅ Auth
-app.use('/api/users', userRoutes);                   // ✅ User Profile & Stats
-app.use('/api/questions', questionRoutes);          // ✅ Questions
-app.use('/api/tests', testRoutes);                  // ✅ Tests
-app.use('/api/admin', adminRoutes);                 // ✅ Admin stats
-app.use('/api/scheduled-tests', scheduledTestRoutes); // ✅ Scheduled Tests
-app.use('/api/notifications', notificationRoutes);  // ✅ Notifications
-app.use('/api/ai', aiRoutes);                       // ✅ AI Study Assistant
-
+// ─── API Routes ───────────────────────────────────────────────
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/questions', questionRoutes);
+app.use('/api/tests', testRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/scheduled-tests', scheduledTestRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/ai', aiRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────
-// Yeh tab chalega jab koi route match na ho
 app.use((_req: Request, res: Response) => {
   res.status(404).json({
     success: false,
@@ -101,8 +120,7 @@ app.use((_req: Request, res: Response) => {
   });
 });
 
-// ─── Global Error Handler ──────────────────────────────────────
-// Express ka built-in error handler override karte hain
+// ─── Global Error Handler ─────────────────────────────────────
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use(errorHandler);
 

@@ -1,33 +1,28 @@
 // backend/src/utils/generateToken.ts
 // ─────────────────────────────────────────────────────────────
 // JWT Token Generator Utility
-// Kyun alag file: Register + Login dono mein token chahiye
-// DRY principle: ek baar likho, har jagah use karo
+// Uses JWT_EXPIRE from env (default: 7d)
 // ─────────────────────────────────────────────────────────────
 
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 
-// Token generate karne ke liye user ki minimum info chahiye
 interface TokenPayload {
-  id: string;               // MongoDB _id
-  role: 'student' | 'admin'; // User ka role
+  id: string;
+  role: 'student' | 'admin';
 }
 
 const generateToken = (payload: TokenPayload): string => {
   const secret = process.env.JWT_SECRET;
 
-  // Guard: JWT_SECRET .env mein hona ZAROORI hai
   if (!secret) {
     throw new Error('JWT_SECRET is not defined in .env file!');
   }
 
-  // jwt.sign(payload, secret, options)
-  // payload → token ke andar store hoga (user id + role)
-  // secret  → server ka private key — kisi ko pata nahi hona chahiye
-  // expiresIn → token kitne time mein expire hoga (7 days)
-  return jwt.sign(payload, secret, {
-    expiresIn: '7d', // 7 din baad dobara login karna padega
-  });
+  const options: SignOptions = {
+    expiresIn: (process.env.JWT_EXPIRE || '7d') as jwt.SignOptions['expiresIn'],
+  };
+
+  return jwt.sign(payload, secret, options);
 };
 
 export default generateToken;

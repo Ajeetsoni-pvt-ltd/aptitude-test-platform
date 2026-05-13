@@ -1,29 +1,59 @@
 // backend/src/routes/authRoutes.ts
 // ─────────────────────────────────────────────────────────────
-// Auth Routes: Register + Login + GetMe
-// Kyun alag routes file: app.ts clean rahega
-// Agar kal auth logic change karna ho — sirf yahi file dekhni hogi
+// Auth Routes — Signup, Login, Email Verification, Password Reset
+// Each route has its own rate limiter + input validator
 // ─────────────────────────────────────────────────────────────
 
 import { Router } from 'express';
-import { register, login, getMe } from '../controllers/authController';
-// Note: protect middleware Step 4 mein banayenge — tab getMe secure hoga
-// import { protect } from '../middlewares/authMiddleware';
+import {
+  register,
+  login,
+  getMe,
+  verifyEmail,
+  resendVerification,
+  forgotPassword,
+  resetPassword,
+} from '../controllers/authController';
 import { protect } from '../middlewares/authMiddleware';
-
+import {
+  validateSignup,
+  validateLogin,
+  validateResendVerification,
+  validateForgotPassword,
+  validateResetPassword,
+} from '../validators/authValidator';
+import {
+  signupLimiter,
+  loginLimiter,
+  resendVerificationLimiter,
+  forgotPasswordLimiter,
+} from '../middlewares/rateLimiter';
 
 const router = Router();
 
 // ─── Public Routes (No token required) ────────────────────────
-// POST /api/auth/register → Naya user banao
-router.post('/register', register);
 
-// POST /api/auth/login → Login karo, token pao
-router.post('/login', login);
+// POST /api/auth/signup → Register new user + send verification email
+router.post('/signup', signupLimiter, validateSignup, register);
 
-// ─── Semi-Private (Step 4 ke baad protect add karenge) ────────
-// GET /api/auth/me → Apni profile dekho (token chahiye)
-// router.get('/me', protect, getMe);  // ← Step 4 baad uncomment karna
-router.get('/me', protect, getMe); // Temporary: Step 4 tak bina protect ke
+// POST /api/auth/login → Login (only verified users get JWT)
+router.post('/login', loginLimiter, validateLogin, login);
+
+// GET /api/auth/verify-email?token=xxx → Verify email address
+router.get('/verify-email', verifyEmail);
+
+// POST /api/auth/resend-verification → Resend verification email
+router.post('/resend-verification', resendVerificationLimiter, validateResendVerification, resendVerification);
+
+// POST /api/auth/forgot-password → Request password reset email
+router.post('/forgot-password', forgotPasswordLimiter, validateForgotPassword, forgotPassword);
+
+// POST /api/auth/reset-password → Reset password with token
+router.post('/reset-password', validateResetPassword, resetPassword);
+
+// ─── Protected Routes (Token required) ────────────────────────
+
+// GET /api/auth/me → Get current user profile
+router.get('/me', protect, getMe);
 
 export default router;
