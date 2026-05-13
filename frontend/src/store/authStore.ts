@@ -1,17 +1,15 @@
 // frontend/src/store/authStore.ts
 // ─────────────────────────────────────────────────────────────
 // Zustand Auth Store — Global Authentication State
-// Zustand + localStorage = Best of both worlds [web:103]
-//   Zustand  → Instant UI updates (reactive)
-//   localStorage → Page refresh ke baad bhi login rahe (persistent)
+// Updated for email verification flow:
+//   signup → success message (no JWT) → verify email → login → JWT
 // ─────────────────────────────────────────────────────────────
 
 import { create } from 'zustand';
-import { loginApi, registerApi } from '@/api/authApi';
+import { loginApi, signupApi } from '@/api/authApi';
 import type { User, LoginFormData, RegisterFormData } from '@/types';
 
 // ─── localStorage Keys ────────────────────────────────────────
-// Prefix 'apt_' → other apps ke keys se conflict nahi hoga
 const TOKEN_KEY = 'apt_token';
 const USER_KEY  = 'apt_user';
 const normalizeEmail = (email: string) => email.toLowerCase().trim();
@@ -25,28 +23,36 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
 
+  // Registration state (for post-signup email verification UI)
+  registrationSuccess: boolean;
+  registrationEmail: string | null;
+
   // Actions
   login: (data: LoginFormData) => Promise<void>;
   register: (data: RegisterFormData) => Promise<void>;
   logout: () => void;
-  initAuth: () => void;    // App start hone pe call karo
-  clearError: () => void;  // Error message clear karo
+  initAuth: () => void;
+  clearError: () => void;
+  clearRegistration: () => void;
 }
 
 // ─── Store Create karo ────────────────────────────────────────
 export const useAuthStore = create<AuthState>((set) => ({
 
   // ─── Initial State ─────────────────────────────────────────
-  // localStorage check karo → pehle se logged in hai?
   user:            null,
   token:           null,
   isAuthenticated: false,
   isLoading:       false,
   error:           null,
 
+  // Registration state
+  registrationSuccess: false,
+  registrationEmail: null,
+
   // ═══════════════════════════════════════════════════════════
   // ACTION: initAuth
-  // App start hone pe call karo (main.tsx ya App.tsx mein)
+  // App start hone pe call karo (App.tsx mein)
   // localStorage mein token hai toh → state restore karo
   // ═══════════════════════════════════════════════════════════
   initAuth: () => {
@@ -71,11 +77,11 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   // ═══════════════════════════════════════════════════════════
   // ACTION: login
+  // Only verified users will get a JWT from the server
   // ═══════════════════════════════════════════════════════════
   login: async (data: LoginFormData) => {
     set({ isLoading: true, error: null });
     try {
-      // API call
       const response = await loginApi({
         ...data,
         email: normalizeEmail(data.email),
@@ -95,25 +101,26 @@ export const useAuthStore = create<AuthState>((set) => ({
         error: null,
       });
     } catch (err: unknown) {
-      // Axios error se message nikalo
       const message =
         (err as { response?: { data?: { message?: string } } })
-          ?.response?.data?.message || 'Login failed. Dobara try karo.';
+          ?.response?.data?.message || 'Login failed. Please try again.';
       set({ isLoading: false, error: message, isAuthenticated: false });
-      throw err; // Component ko bhi pata chale
+      throw err;
     }
   },
 
   // ═══════════════════════════════════════════════════════════
-  // ACTION: register
+  // ACTION: register (signup)
+  // No longer saves token/user — just sets registrationSuccess
+  // User must verify email before logging in
   // ═══════════════════════════════════════════════════════════
   register: async (data: RegisterFormData) => {
-    set({ isLoading: true, error: null });
+    set({ isLoading: true, error: null, registrationSuccess: false });
     try {
       const { confirmPassword, ...registerData } = data;
-      void confirmPassword; // TypeScript unused var warning avoid
+      void confirmPassword;
 
-      const response = await registerApi({
+      await signupApi({
         ...registerData,
         name: registerData.name.trim(),
         email: normalizeEmail(registerData.email),
@@ -121,49 +128,49 @@ export const useAuthStore = create<AuthState>((set) => ({
         branch: registerData.branch.trim(),
         section: registerData.section.trim(),
       });
-      const { token, user } = response.data;
 
-      localStorage.setItem(TOKEN_KEY, token);
-      localStorage.setItem(USER_KEY, JSON.stringify(user));
-
+      // Success — user needs to check email
       set({
-        token,
-        user,
-        isAuthenticated: true,
         isLoading: false,
         error: null,
+        registrationSuccess: true,
+        registrationEmail: normalizeEmail(registerData.email),
       });
     } catch (err: unknown) {
       const message =
         (err as { response?: { data?: { message?: string } } })
-          ?.response?.data?.message || 'Registration failed. Dobara try karo.';
-      set({ isLoading: false, error: message, isAuthenticated: false });
+          ?.response?.data?.message || 'Registration failed. Please try again.';
+      set({ isLoading: false, error: message, registrationSuccess: false });
       throw err;
     }
   },
 
   // ═══════════════════════════════════════════════════════════
   // ACTION: logout
-  // State + localStorage dono clean karo [web:103]
   // ═══════════════════════════════════════════════════════════
   logout: () => {
-    // localStorage clean karo
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
 
-    // Zustand state reset karo
     set({
       user: null,
       token: null,
       isAuthenticated: false,
       isLoading: false,
       error: null,
+      registrationSuccess: false,
+      registrationEmail: null,
     });
   },
 
   // ═══════════════════════════════════════════════════════════
   // ACTION: clearError
-  // Form submit ke baad error message hide karne ke liye
   // ═══════════════════════════════════════════════════════════
   clearError: () => set({ error: null }),
+
+  // ═══════════════════════════════════════════════════════════
+  // ACTION: clearRegistration
+  // Reset registration state (for navigating back to form)
+  // ═══════════════════════════════════════════════════════════
+  clearRegistration: () => set({ registrationSuccess: false, registrationEmail: null }),
 }));
