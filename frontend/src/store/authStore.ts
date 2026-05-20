@@ -32,6 +32,7 @@ interface AuthState {
   register: (data: RegisterFormData) => Promise<void>;
   logout: () => void;
   initAuth: () => void;
+  updateUser: (updates: Partial<User>) => void;
   clearError: () => void;
   clearRegistration: () => void;
 }
@@ -162,6 +163,14 @@ export const useAuthStore = create<AuthState>((set) => ({
       registrationEmail: null,
     });
   },
+
+  updateUser: (updates: Partial<User>) => set((state) => {
+    if (!state.user) return state;
+
+    const user = { ...state.user, ...updates };
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    return { user };
+  }),
 
   // ═══════════════════════════════════════════════════════════
   // ACTION: clearError

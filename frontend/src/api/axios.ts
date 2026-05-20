@@ -5,13 +5,19 @@
 
 import axios from 'axios';
 
-// 🔥 Base URL (env + fallback)
-const BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'http://13.201.55.196:5000';
+const normalizeApiBaseUrl = (value?: string) => {
+  const raw = value?.trim() || '/api';
+  const withoutTrailingSlash = raw.replace(/\/$/, '');
+  return withoutTrailingSlash.endsWith('/api')
+    ? withoutTrailingSlash
+    : `${withoutTrailingSlash}/api`;
+};
+
+export const BASE_URL = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL);
 
 // ─── Axios Instance ───────────────────────────────────────────
 const apiClient = axios.create({
- baseURL: BASE_URL,// ✅ IMPORTANT (/api added)
+  baseURL: BASE_URL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',

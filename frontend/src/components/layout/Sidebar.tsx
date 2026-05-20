@@ -244,6 +244,7 @@ const Sidebar = ({ isMobile, onClose }: SidebarProps) => {
               role={user.role}
               size="sm"
               showRing={!collapsed}
+              imageUrl={user.profilePicture}
             />
             {!collapsed && (
               <div className="flex-1 min-w-0">

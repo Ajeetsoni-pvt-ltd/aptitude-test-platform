@@ -7,6 +7,7 @@ export interface User {
   section: string;
   role: 'student' | 'admin';
   isVerified?: boolean;
+  profilePicture?: string;
   createdAt?: string;
 }
 

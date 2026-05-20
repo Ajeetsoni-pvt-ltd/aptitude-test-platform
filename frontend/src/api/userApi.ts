@@ -51,12 +51,22 @@ export const uploadProfilePictureApi = async (file: File): Promise<ApiResponse<{
 }>> => {
   const formData = new FormData();
   formData.append('profilePicture', file);
-  const response = await apiClient.post('/users/profile-picture', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
+  
+  console.log('[uploadProfilePictureApi] Uploading profile picture:', {
+    fileName: file.name,
+    fileSize: file.size,
+    fileType: file.type,
   });
-  return response.data;
+
+  try {
+    const response = await apiClient.post('/users/profile-picture', formData);
+
+    console.log('[uploadProfilePictureApi] Upload successful:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('[uploadProfilePictureApi] Upload failed:', error);
+    throw error;
+  }
 };
 
 // ─── Get Global Leaderboard ────────────────────────────────────
