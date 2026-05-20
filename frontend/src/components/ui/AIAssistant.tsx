@@ -8,12 +8,12 @@ import { chatWithAIApi, type ChatMessage } from '@/api/aiApi';
 
 // ── Quick suggestion chips ────────────────────────────────────
 const SUGGESTIONS = [
-  'How do I improve my quantitative score?',
-  'What topics appear most in TCS NQT?',
-  'Give me a study plan for 2 weeks',
-  'Explain permutations & combinations',
-  'How to solve time & work problems fast?',
-  'What is the best strategy for verbal ability?',
+  'Solve: A train crosses a pole in 12 sec at 54 km/h. Find length.',
+  'Explain permutations vs combinations with examples',
+  'Give me a 14-day placement aptitude plan',
+  'Solve a medium time & work problem step by step',
+  'Write C++ code for binary search with complexity',
+  'Explain SQL joins for interviews',
 ];
 
 // ── Simple markdown-to-JSX renderer ──────────────────────────
@@ -25,7 +25,52 @@ const MarkdownText = ({ text }: { text: string }) => {
   while (i < lines.length) {
     const line = lines[i];
 
-    if (!line.trim()) {
+    if (line.trim().startsWith('```')) {
+      const language = line.trim().replace(/```/, '').trim();
+      const codeLines: string[] = [];
+      i++;
+
+      while (i < lines.length && !lines[i].trim().startsWith('```')) {
+        codeLines.push(lines[i]);
+        i++;
+      }
+
+      elements.push(
+        <pre key={`code-${i}`} className="my-2 max-w-full overflow-x-auto rounded-lg border border-white/10 bg-black/35 p-2.5 text-[11px] leading-relaxed text-neon-cyan">
+          {language && <div className="mb-1 text-[9px] uppercase tracking-widest text-white/25">{language}</div>}
+          <code>{codeLines.join('\n')}</code>
+        </pre>
+      );
+    } else if (/^\|.+\|$/.test(line.trim())) {
+      const tableLines = [line];
+      i++;
+
+      while (i < lines.length && /^\|.+\|$/.test(lines[i].trim())) {
+        tableLines.push(lines[i]);
+        i++;
+      }
+      i--;
+
+      elements.push(
+        <div key={`table-${i}`} className="my-2 overflow-x-auto rounded-lg border border-white/10">
+          <table className="w-full text-[11px]">
+            <tbody>
+              {tableLines
+                .filter((row) => !/^\|\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?$/.test(row))
+                .map((row, rowIndex) => (
+                  <tr key={`${row}-${rowIndex}`} className={rowIndex === 0 ? 'bg-white/5 text-white/90' : 'border-t border-white/5'}>
+                    {row.split('|').filter(Boolean).map((cell, cellIndex) => (
+                      <td key={`${cell}-${cellIndex}`} className="px-2 py-1 align-top">
+                        {renderInline(cell.trim())}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    } else if (!line.trim()) {
       elements.push(<div key={`br-${i}`} className="h-1" />);
     } else if (line.startsWith('### ')) {
       elements.push(
@@ -35,7 +80,7 @@ const MarkdownText = ({ text }: { text: string }) => {
       );
     } else if (line.startsWith('## ')) {
       elements.push(
-        <p key={i} className="font-bold text-neon-violet text-xs mt-2 mb-0.5">
+        <p key={i} className="font-bold text-neon-violet text-sm mt-3 mb-1">
           {line.replace('## ', '')}
         </p>
       );
@@ -67,7 +112,7 @@ const MarkdownText = ({ text }: { text: string }) => {
     }
     i++;
   }
-  return <div className="space-y-0.5">{elements}</div>;
+  return <div className="space-y-1">{elements}</div>;
 };
 
 const renderInline = (text: string): (string | React.ReactElement)[] => {
@@ -150,10 +195,11 @@ const AIAssistant = () => {
       }
     } catch (error) {
       console.error('[AI Chat Error]', error);
-      let errorMsg = 'Network error. Please check your connection.';
+      const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      let errorMsg = responseMessage || 'Network error. Please check your connection.';
       
       // More detailed error reporting
-      if (error instanceof Error) {
+      if (!responseMessage && error instanceof Error) {
         if (error.message.includes('401')) {
           errorMsg = 'You need to login to use the AI assistant.';
         } else if (error.message.includes('Network')) {
@@ -202,7 +248,7 @@ const AIAssistant = () => {
 
       {/* ── Chat Panel ───────────────────────────────────────── */}
       <div className={cn(
-        'fixed bottom-24 right-6 z-50 w-80 sm:w-96',
+        'fixed bottom-24 right-6 z-50 w-[min(92vw,28rem)]',
         'glass-strong rounded-2xl border border-neon-violet/20',
         'flex flex-col overflow-hidden',
         'transition-all duration-300 origin-bottom-right',
@@ -232,7 +278,7 @@ const AIAssistant = () => {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 max-h-80" style={{ scrollbarWidth: 'thin' }}>
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 max-h-[60vh]" style={{ scrollbarWidth: 'thin' }}>
           {messages.map((msg, idx) => (
             <div key={idx} className={cn('flex gap-2', msg.role === 'user' && 'flex-row-reverse')}>
               <div className={cn(

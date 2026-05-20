@@ -6,6 +6,7 @@ import HoloButton from '@/components/ui/HoloButton';
 import NeuralAvatar from '@/components/ui/NeuralAvatar';
 import CyberInput from '@/components/ui/CyberInput';
 import { getUserProfileApi, getUserStatsApi, updateUserProfileApi, uploadProfilePictureApi } from '@/api/userApi';
+import { useAuthStore } from '@/store/authStore';
 import { User, Mail, Shield, Edit3, Save, X, Zap, Activity, Trophy, Clock, Upload, AlertTriangle, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -48,6 +49,7 @@ const ProfilePage = () => {
   const [uploadError, setUploadError] = useState('');
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const updateAuthUser = useAuthStore((state) => state.updateUser);
 
   // Fetch profile and stats on mount
   useEffect(() => {
@@ -61,6 +63,12 @@ const ProfilePage = () => {
         const profileRes = await getUserProfileApi();
         if (profileRes.success && profileRes.data) {
           setProfile(profileRes.data);
+          updateAuthUser({
+            name: profileRes.data.name,
+            email: profileRes.data.email,
+            role: profileRes.data.role,
+            profilePicture: profileRes.data.profilePicture,
+          });
           setEditName(profileRes.data.name);
           setEditEmail(profileRes.data.email);
         }
@@ -82,7 +90,7 @@ const ProfilePage = () => {
     };
 
     fetchData();
-  }, []);
+  }, [updateAuthUser]);
 
   // Handle profile picture selection
   const handlePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -121,16 +129,39 @@ const ProfilePage = () => {
     setUploadError('');
 
     try {
+      console.log('[ProfilePage] Starting profile picture upload...', {
+        fileName: selectedFile.name,
+        fileSize: selectedFile.size,
+        fileType: selectedFile.type,
+      });
+
       const res = await uploadProfilePictureApi(selectedFile);
-      if (res.success && profile) {
-        setProfile({ ...profile, profilePicture: res.data?.profilePicture });
+
+      console.log('[ProfilePage] Upload response:', res);
+
+      if (res.success && res.data?.profilePicture && profile) {
+        console.log('[ProfilePage] Upload successful. New image URL:', res.data.profilePicture);
+
+        // Update profile with new image URL
+        const updatedProfile = { ...profile, profilePicture: res.data.profilePicture };
+        setProfile(updatedProfile);
+        updateAuthUser({ profilePicture: res.data.profilePicture });
+
+        // Clear preview and temp file
         setPreviewImage(null);
         setSelectedFile(null);
+
+        console.log('[ProfilePage] Profile state updated successfully');
+      } else {
+        throw new Error(res.data?.message || 'Upload successful but no image URL returned');
       }
     } catch (err: unknown) {
+      console.error('[ProfilePage] Upload failed:', err);
+
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
         'Failed to upload image. Please try again.';
+
       setUploadError(msg);
     } finally {
       setUploadingPicture(false);
@@ -173,6 +204,11 @@ const ProfilePage = () => {
           ...profile!,
           name: res.data.name,
           email: res.data.email,
+        });
+        updateAuthUser({
+          name: res.data.name,
+          email: res.data.email,
+          profilePicture: res.data.profilePicture,
         });
         setEditing(false);
       }

@@ -1,5 +1,7 @@
 // src/components/ui/NeuralAvatar.tsx
+import { useEffect, useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { normalizeImageUrl } from '@/utils/imageUtils';
 
 interface NeuralAvatarProps {
   name: string;
@@ -28,9 +30,22 @@ const NeuralAvatar = ({
   className,
   imageUrl,
 }: NeuralAvatarProps) => {
+  const [imageLoadError, setImageLoadError] = useState(false);
+  const normalizedImageUrl = useMemo(() => normalizeImageUrl(imageUrl), [imageUrl]);
   const { outer, inner, fontSize, ringStroke } = sizeMap[size];
   const ringColor = role === 'admin' ? '#9D00FF' : '#00F5FF';
   const ringGlow  = role === 'admin' ? 'rgba(157,0,255,0.8)' : 'rgba(0,245,255,0.8)';
+
+  useEffect(() => {
+    setImageLoadError(false);
+  }, [normalizedImageUrl]);
+
+  const shouldShowImage = Boolean(normalizedImageUrl && !imageLoadError);
+
+  const handleImageError = () => {
+    console.warn(`[NeuralAvatar] Failed to load image for ${name}:`, normalizedImageUrl);
+    setImageLoadError(true);
+  };
 
   return (
     <div
@@ -71,8 +86,14 @@ const NeuralAvatar = ({
           color: '#fff',
         }}
       >
-        {imageUrl ? (
-          <img src={imageUrl} alt={name} className="w-full h-full object-cover rounded-full" />
+        {shouldShowImage ? (
+          <img
+            src={normalizedImageUrl}
+            alt={name}
+            className="w-full h-full object-cover rounded-full"
+            onError={handleImageError}
+            loading="lazy"
+          />
         ) : (
           getInitials(name)
         )}

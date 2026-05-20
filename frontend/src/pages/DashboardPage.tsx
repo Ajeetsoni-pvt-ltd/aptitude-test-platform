@@ -204,7 +204,12 @@ const DashboardPage = () => {
         </div>
 
         <div className="hidden sm:flex items-center gap-3 flex-shrink-0">
-          <NeuralAvatar name={user?.name ?? 'User'} role={user?.role} size="md" />
+          <NeuralAvatar
+            name={user?.name ?? 'User'}
+            role={user?.role}
+            size="md"
+            imageUrl={user?.profilePicture}
+          />
         </div>
       </div>
 

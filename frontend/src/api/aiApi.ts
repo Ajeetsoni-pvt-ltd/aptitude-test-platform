@@ -9,7 +9,7 @@ export interface ChatMessage {
 export const chatWithAIApi = async (
   message: string,
   conversationHistory: ChatMessage[]
-): Promise<{ success: boolean; data?: { reply: string }; message?: string }> => {
+): Promise<{ success: boolean; data?: { reply: string; model?: string; topic?: string }; message?: string }> => {
   const response = await apiClient.post('/ai/chat', {
     message,
     conversationHistory: conversationHistory.slice(-8), // last 4 pairs

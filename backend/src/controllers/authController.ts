@@ -269,6 +269,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
         section: user.section,
         role: user.role,
         isVerified: user.isVerified,
+        profilePicture: user.profilePicture,
       },
     })
   );
@@ -380,6 +381,7 @@ export const getMe = asyncHandler(async (req: Request, res: Response) => {
       section: user.section,
       role: user.role,
       isVerified: user.isVerified,
+      profilePicture: user.profilePicture,
       createdAt: user.createdAt,
     })
   );
