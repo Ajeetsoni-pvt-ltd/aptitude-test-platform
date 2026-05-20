@@ -32,6 +32,7 @@ app.set('trust proxy', 1);
 app.use(helmet({
   // Allow inline styles for email templates preview (dev only)
   contentSecurityPolicy: isProduction ? undefined : false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
   // HSTS: tell browsers to always use HTTPS (production only)
   hsts: isProduction ? { maxAge: 31536000, includeSubDomains: true } : false,
 }));

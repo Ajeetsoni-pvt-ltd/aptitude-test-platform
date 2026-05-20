@@ -1,102 +1,109 @@
 import { Request, Response } from 'express';
 import asyncHandler from '../utils/asyncHandler';
 import { successResponse, errorResponse } from '../utils/ApiResponse';
+import { generateTutorResponse, TutorChatMessage } from '../services/geminiTutor.service';
 
-// Interface for chat messages
-interface ChatMessage {
-  role: 'user' | 'ai';
-  content: string;
-}
+const MAX_MESSAGE_LENGTH = 8000;
 
-// Mock AI responses for aptitude questions
-// In production, replace this with actual OpenAI API calls
-const aptitudeResponses: { [key: string]: string } = {
-  quantitative: `I'll help you with quantitative aptitude! Here are the key areas:
-1. **Arithmetic**: Percentage, Profit-Loss, Simple/Compound Interest
-2. **Algebra**: Equations, Inequalities, Functions
-3. **Geometry**: Areas, Volumes, Angles
-4. **Number Systems**: HCF, LCM, Prime Numbers
-5. **Speed & Distance**: Time, Work, Pipes & Cistern
+const getSafeAiError = (message: string) => {
+  if (message.includes('GEMINI_API_KEY') || message.includes('API key')) {
+    return {
+      status: 503,
+      text: 'AI service is not configured. Please set GEMINI_API_KEY on the backend.',
+    };
+  }
 
-What specific topic would you like to work on?`,
+  if (/not found|not supported|404/i.test(message)) {
+    return {
+      status: 502,
+      text: 'The configured Gemini model is unavailable. Update GEMINI_MODEL to gemini-2.5-flash or another supported Gemini model.',
+    };
+  }
 
-  logical: `Great! Let me help with logical reasoning:
-1. **Syllogism**: Venn diagrams, Logical statements
-2. **Sequence Series**: Number patterns, Letter patterns
-3. **Coding-Decoding**: Letter/Number shifts, Patterns
-4. **Analogies**: Word relationships, Number relationships
-5. **Blood Relations**: Family trees, Relationships
+  if (/quota|rate limit|429/i.test(message)) {
+    return {
+      status: 429,
+      text: 'Gemini rate limit or quota was reached. Please wait a moment and try again.',
+    };
+  }
 
-Which topic interests you?`,
+  return {
+    status: 502,
+    text: 'AI service could not generate a reliable response right now. Please try again.',
+  };
+};
 
-  verbal: `Let's improve your verbal ability:
-1. **Vocabulary**: Synonyms, Antonyms, Word meanings
-2. **Reading Comprehension**: Understanding passages
-3. **Grammar**: Sentence correction, Parts of speech
-4. **Sentence Completion**: Fill in the blanks
-5. **Error Spotting**: Identifying grammatical errors
+const sanitizeHistory = (history: unknown): TutorChatMessage[] => {
+  if (!Array.isArray(history)) return [];
 
-What would you like to practice?`,
-
-  default: `Hello! 🧠 I'm your AI Study Assistant. I can help you with:
-
-**Quantitative Aptitude** - Math, Numbers, Calculations
-**Logical Reasoning** - Patterns, Analogies, Deduction
-**Verbal Ability** - English, Vocabulary, Grammar
-
-Ask me any question or type:
-- "quantitative" for math help
-- "logical" for reasoning topics
-- "verbal" for English help
-
-What would you like to learn?`,
+  return history
+    .filter((entry): entry is TutorChatMessage => {
+      const candidate = entry as Partial<TutorChatMessage>;
+      return (
+        (candidate.role === 'user' || candidate.role === 'ai') &&
+        typeof candidate.content === 'string' &&
+        candidate.content.trim().length > 0
+      );
+    })
+    .map((entry) => ({
+      role: entry.role,
+      content: entry.content.trim(),
+    }));
 };
 
 /**
  * POST /api/ai/chat
- * Chat with AI Study Assistant for aptitude preparation
+ * Chat with Gemini-powered placement preparation tutor.
  */
 export const chatWithAI = asyncHandler(async (req: Request, res: Response) => {
   const { message, conversationHistory } = req.body;
 
-  // Validate input
   if (!message || typeof message !== 'string') {
-    res.status(400).json(
-      errorResponse('Message is required and must be a string')
-    );
+    res.status(400).json(errorResponse('Message is required and must be a string.'));
     return;
   }
 
-  const userMessage = message.toLowerCase().trim();
+  const trimmedMessage = message.trim();
 
-  // Determine response based on user input
-  let reply = aptitudeResponses.default;
-
-  if (userMessage.includes('quantitative') || userMessage.includes('math') || userMessage.includes('arithmetic')) {
-    reply = aptitudeResponses.quantitative;
-  } else if (userMessage.includes('logical') || userMessage.includes('reasoning') || userMessage.includes('pattern')) {
-    reply = aptitudeResponses.logical;
-  } else if (userMessage.includes('verbal') || userMessage.includes('english') || userMessage.includes('grammar')) {
-    reply = aptitudeResponses.verbal;
-  } else if (userMessage.includes('help') || userMessage.includes('hi') || userMessage.includes('hello')) {
-    reply = aptitudeResponses.default;
-  } else {
-    // Default helpful response
-    reply = `I understand you're asking: "${message}"\n\nTo get better help, please specify:\n- **Quantitative** topics (Math, Numbers)\n- **Logical** reasoning (Patterns, Puzzles)\n- **Verbal** ability (English, Grammar)\n\nWhich area would you like to focus on?`;
+  if (trimmedMessage.length > MAX_MESSAGE_LENGTH) {
+    res.status(413).json(errorResponse(`Message is too long. Please keep it under ${MAX_MESSAGE_LENGTH} characters.`));
+    return;
   }
 
-  // Return response
-  res.status(200).json(
-    successResponse('Response generated successfully', { reply })
-  );
+  try {
+    const result = await generateTutorResponse(trimmedMessage, sanitizeHistory(conversationHistory));
+
+    res.status(200).json(
+      successResponse('Response generated successfully.', {
+        reply: result.reply,
+        model: result.model,
+        topic: result.topic,
+      })
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'AI response generation failed.';
+    const safeError = getSafeAiError(message);
+    console.error('[ai:chat:error]', { message });
+
+    res.status(safeError.status).json(errorResponse(safeError.text));
+  }
 });
 
 /**
  * GET /api/ai/health
- * Check if AI service is available
+ * Check if AI service is configured.
  */
-export const aiHealth = asyncHandler(async (req: Request, res: Response) => {
-  res.status(200).json(
-    successResponse('AI service healthy', { status: 'AI service is operational' })
+export const aiHealth = asyncHandler(async (_req: Request, res: Response) => {
+  const configured = Boolean(process.env.GEMINI_API_KEY?.trim());
+  const payload = {
+      configured,
+      model: process.env.GEMINI_MODEL?.trim() || 'gemini-2.5-flash',
+      status: configured ? 'Gemini tutor is configured.' : 'GEMINI_API_KEY is missing.',
+  };
+
+  res.status(configured ? 200 : 503).json(
+    configured
+      ? successResponse('AI service health checked.', payload)
+      : errorResponse('AI service is not configured.')
   );
 });

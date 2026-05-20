@@ -12,6 +12,7 @@ import User from '../models/User';
 import TestAttempt from '../models/TestAttempt';
 import asyncHandler from '../utils/asyncHandler';
 import { successResponse, errorResponse } from '../utils/ApiResponse';
+import { storeUploadedImage } from '../services/imageStorage';
 
 // ═══════════════════════════════════════════════════════════════
 // @desc    Get current user's profile
@@ -195,31 +196,36 @@ export const uploadProfilePicture = asyncHandler(async (req: Request, res: Respo
     return;
   }
 
-  // Create file path (using timestamp for uniqueness)
-  const timestamp = Date.now();
-  const fileExt = req.file.mimetype.split('/')[1];
-  const filename = `profile-${userId}-${timestamp}.${fileExt}`;
-  const filepath = `uploads/profiles/${filename}`;
+  try {
+    // Process and upload image using imageStorage service
+    // Handles: image optimization, Cloudinary upload (prod), local storage (dev)
+    const imageUrl = await storeUploadedImage(req.file, req, 'user-profiles');
 
-  // In production, use cloud storage (AWS S3, Cloudinary, etc.)
-  // For now, store filename in DB
-  const user = await User.findByIdAndUpdate(
-    userId,
-    { profilePicture: filepath },
-    { new: true }
-  ).select('-password');
+    console.log(`[uploadProfilePicture] Image uploaded for user ${userId}: ${imageUrl}`);
 
-  if (!user) {
-    res.status(404).json(errorResponse('User not found.'));
-    return;
+    // Save image URL to database
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { profilePicture: imageUrl },
+      { new: true }
+    ).select('-password');
+
+    if (!user) {
+      res.status(404).json(errorResponse('User not found.'));
+      return;
+    }
+
+    res.status(200).json(
+      successResponse('Profile picture uploaded successfully.', {
+        profilePicture: user.profilePicture,
+        message: 'Image processed, optimized, and saved.',
+      })
+    );
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to upload image.';
+    console.error(`[uploadProfilePicture] Error uploading image for user ${userId}:`, errorMessage);
+    res.status(500).json(errorResponse(errorMessage));
   }
-
-  res.status(200).json(
-    successResponse('Profile picture uploaded successfully.', {
-      profilePicture: user.profilePicture,
-      message: 'Image processed and saved.',
-    })
-  );
 });
 
 // ═══════════════════════════════════════════════════════════════

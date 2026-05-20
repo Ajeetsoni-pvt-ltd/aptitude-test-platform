@@ -12,7 +12,7 @@ interface ProcessedImage {
 
 const MAX_DIMENSION = 1800;
 const MAX_IMAGE_BYTES = 1024 * 1024;
-const LOCAL_UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'questions');
+const LOCAL_UPLOAD_ROOT = path.join(process.cwd(), 'uploads');
 
 const getPublicBaseUrl = (req: Request) => {
   const configuredBaseUrl = process.env.PUBLIC_SERVER_URL?.trim();
@@ -23,8 +23,15 @@ const getPublicBaseUrl = (req: Request) => {
   return `${req.protocol}://${req.get('host')}`;
 };
 
-const ensureLocalUploadDir = async () => {
-  await fs.promises.mkdir(LOCAL_UPLOAD_DIR, { recursive: true });
+const sanitizePathSegment = (value?: string) => {
+  const segment = value?.trim().replace(/[^a-zA-Z0-9_-]/g, '-').replace(/-+/g, '-');
+  return segment || 'questions';
+};
+
+const ensureLocalUploadDir = async (folder: string) => {
+  const uploadDir = path.join(LOCAL_UPLOAD_ROOT, folder);
+  await fs.promises.mkdir(uploadDir, { recursive: true });
+  return uploadDir;
 };
 
 const processImageBuffer = async (buffer: Buffer): Promise<ProcessedImage> => {
@@ -75,7 +82,12 @@ const uploadToCloudinary = async (
   }
 
   const timestamp = Math.floor(Date.now() / 1000);
-  const publicId = `${path.parse(originalName).name}-${crypto.randomUUID()}`;
+  const safeBaseName = path
+    .parse(originalName)
+    .name.replace(/[^a-zA-Z0-9_-]/g, '-')
+    .replace(/-+/g, '-')
+    .toLowerCase();
+  const publicId = `${safeBaseName || 'image'}-${crypto.randomUUID()}`;
   const signaturePayload = `folder=${folder}&public_id=${publicId}&timestamp=${timestamp}${apiSecret}`;
   const signature = crypto.createHash('sha1').update(signaturePayload).digest('hex');
 
@@ -108,9 +120,11 @@ const uploadToCloudinary = async (
 const storeLocally = async (
   processedImage: ProcessedImage,
   originalName: string,
-  req: Request
+  req: Request,
+  folder = 'questions'
 ) => {
-  await ensureLocalUploadDir();
+  const safeFolder = sanitizePathSegment(folder);
+  const uploadDir = await ensureLocalUploadDir(safeFolder);
 
   const safeBaseName = path
     .parse(originalName)
@@ -118,12 +132,12 @@ const storeLocally = async (
     .replace(/-+/g, '-')
     .toLowerCase();
 
-  const fileName = `${safeBaseName || 'question'}-${crypto.randomUUID()}.${processedImage.extension}`;
-  const filePath = path.join(LOCAL_UPLOAD_DIR, fileName);
+  const fileName = `${safeBaseName || 'image'}-${crypto.randomUUID()}.${processedImage.extension}`;
+  const filePath = path.join(uploadDir, fileName);
 
   await fs.promises.writeFile(filePath, processedImage.buffer);
 
-  return `${getPublicBaseUrl(req)}/uploads/questions/${fileName}`;
+  return `${getPublicBaseUrl(req)}/uploads/${safeFolder}/${fileName}`;
 };
 
 export const buildPreviewImageUrl = async (buffer: Buffer) => {
@@ -134,7 +148,7 @@ export const buildPreviewImageUrl = async (buffer: Buffer) => {
 export const storeUploadedImage = async (
   file: Express.Multer.File,
   req: Request,
-  folder?: string
+  folder = 'questions'
 ) => {
   const processedImage = await processImageBuffer(file.buffer);
   const cloudinaryEnabled =
@@ -146,5 +160,5 @@ export const storeUploadedImage = async (
     return uploadToCloudinary(processedImage, file.originalname, folder);
   }
 
-  return storeLocally(processedImage, file.originalname, req);
+  return storeLocally(processedImage, file.originalname, req, folder);
 };
