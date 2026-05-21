@@ -51,7 +51,7 @@ export const uploadProfilePictureApi = async (file: File): Promise<ApiResponse<{
 }>> => {
   const formData = new FormData();
   formData.append('profilePicture', file);
-  
+
   console.log('[uploadProfilePictureApi] Uploading profile picture:', {
     fileName: file.name,
     fileSize: file.size,
@@ -59,7 +59,13 @@ export const uploadProfilePictureApi = async (file: File): Promise<ApiResponse<{
   });
 
   try {
-    const response = await apiClient.post('/users/profile-picture', formData);
+    // Do NOT set Content-Type manually — let the browser set it automatically
+    // with the correct multipart/form-data boundary. Overriding it breaks the upload.
+    const response = await apiClient.post('/users/profile-picture', formData, {
+      headers: {
+        'Content-Type': undefined, // Remove the default application/json header
+      },
+    });
 
     console.log('[uploadProfilePictureApi] Upload successful:', response.data);
     return response.data;

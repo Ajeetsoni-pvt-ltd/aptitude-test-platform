@@ -16,12 +16,15 @@ const normalizeApiBaseUrl = (value?: string) => {
 export const BASE_URL = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL);
 
 // ─── Axios Instance ───────────────────────────────────────────
+// IMPORTANT: Do NOT set a default Content-Type header here.
+// Axios auto-sets Content-Type based on the request body:
+//   - JSON data → application/json
+//   - FormData  → multipart/form-data (with correct boundary)
+// A hardcoded Content-Type breaks file uploads (multer requires
+// multipart/form-data with boundary, which only the browser can set).
 const apiClient = axios.create({
   baseURL: BASE_URL,
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  timeout: 120_000, // 120s — Gemini AI responses can take 30-90s
 });
 
 // ─── REQUEST Interceptor ──────────────────────────────────────
