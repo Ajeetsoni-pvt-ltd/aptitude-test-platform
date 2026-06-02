@@ -172,13 +172,28 @@ export const updateProfile = asyncHandler(async (req: Request, res: Response) =>
 export const uploadProfilePicture = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user?.id;
 
+  console.log('[uploadProfilePicture] Request received', {
+    userId,
+    hasFile: !!req.file,
+    contentType: req.headers['content-type'],
+    fileDetails: req.file ? {
+      fieldname: req.file.fieldname,
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+    } : 'NO FILE ATTACHED',
+  });
+
   if (!userId) {
     res.status(401).json(errorResponse('User ID not found. Login required.'));
     return;
   }
 
   if (!req.file) {
-    res.status(400).json(errorResponse('No image file provided.'));
+    console.warn('[uploadProfilePicture] No file in request. Content-Type:', req.headers['content-type']);
+    res.status(400).json(errorResponse(
+      'No image file provided. Ensure the request uses multipart/form-data with field name "profilePicture".'
+    ));
     return;
   }
 

@@ -39,6 +39,8 @@ import CreateFullLengthTestPage from '@/pages/admin/CreateFullLengthTestPage';
 import ManageTestsPage     from '@/pages/admin/ManageTestsPage';
 import LiveProctoringPage   from '@/pages/admin/LiveProctoringPage';
 import StudentAnalyticsPage from '@/pages/admin/StudentAnalyticsPage';
+import AdminAnalyticsPage  from '@/pages/admin/AnalyticsPage';
+import AdminSettingsPage   from '@/pages/admin/AdminSettingsPage';
 
 // ── 404 ───────────────────────────────────────────────────────────
 import NotFoundPage from '@/pages/NotFoundPage';
@@ -91,6 +93,8 @@ const AppRouter = () => {
         <Route path="/admin/manage-tests"        element={<ManageTestsPage />} />
         <Route path="/admin/create-full-length-test" element={<CreateFullLengthTestPage />} />
         <Route path="/admin/live-proctoring"         element={<LiveProctoringPage />} />
+        <Route path="/admin/analytics"               element={<AdminAnalyticsPage />} />
+        <Route path="/admin/settings"                element={<AdminSettingsPage />} />
         <Route path="/admin/students/:userId/analytics" element={<StudentAnalyticsPage />} />
       </Route>
 

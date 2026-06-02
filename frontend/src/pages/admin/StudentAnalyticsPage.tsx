@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import AdminLayout from '@/components/AdminLayout';
 import apiClient from '@/api/axios';
+import { useChartColors } from '@/hooks/useChartColors';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   RadarChart, Radar, PolarGrid, PolarAngleAxis,
@@ -57,6 +58,7 @@ const fmtTime = (secs: number) => {
 const StudentAnalyticsPage = () => {
   const { userId } = useParams<{ userId: string }>();
   const navigate   = useNavigate();
+  const chartColors = useChartColors();
   const [data,      setData]      = useState<StudentAnalytics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error,     setError]     = useState('');
@@ -182,12 +184,12 @@ const StudentAnalyticsPage = () => {
                       <stop offset="95%" stopColor="#00F5FF" stopOpacity={0}    />
                     </linearGradient>
                   </defs>
-                  <XAxis dataKey="date" tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }} axisLine={false} tickLine={false}
+                  <XAxis dataKey="date" tick={{ fill: chartColors.tickFill, fontSize: 10 }} axisLine={false} tickLine={false}
                     tickFormatter={(v) => new Date(v).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} />
-                  <YAxis domain={[0, 100]} tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis domain={[0, 100]} tick={{ fill: chartColors.tickFill, fontSize: 10 }} axisLine={false} tickLine={false} />
                   <Tooltip
-                    contentStyle={{ background: 'rgba(13,13,26,0.95)', border: '1px solid rgba(0,245,255,0.2)', borderRadius: 8 }}
-                    labelStyle={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}
+                    contentStyle={chartColors.tooltipStyle}
+                    labelStyle={{ color: chartColors.tooltipLabelColor, fontSize: 11 }}
                     itemStyle={{ color: '#00F5FF' }}
                   />
                   <Area type="monotone" dataKey="score" stroke="#00F5FF" fill="url(#studGrad)" strokeWidth={2} name="Score" />
@@ -203,8 +205,8 @@ const StudentAnalyticsPage = () => {
             {radarData.length > 0 ? (
               <ResponsiveContainer width="100%" height={180}>
                 <RadarChart data={radarData}>
-                  <PolarGrid stroke="rgba(255,255,255,0.06)" />
-                  <PolarAngleAxis dataKey="subject" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10 }} />
+                  <PolarGrid stroke={chartColors.gridStroke} />
+                  <PolarAngleAxis dataKey="subject" tick={{ fill: chartColors.tickFill, fontSize: 10 }} />
                   <Radar name="Accuracy" dataKey="value" stroke="#9D00FF" fill="#9D00FF" fillOpacity={0.15} strokeWidth={2} />
                 </RadarChart>
               </ResponsiveContainer>

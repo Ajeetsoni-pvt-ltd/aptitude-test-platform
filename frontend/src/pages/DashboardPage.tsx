@@ -15,6 +15,7 @@ import HoloButton from '@/components/ui/HoloButton';
 import NeuralAvatar from '@/components/ui/NeuralAvatar';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ProgressRing from '@/components/ui/ProgressRing';
+import { useChartColors } from '@/hooks/useChartColors';
 import {
   XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart
 } from 'recharts';
@@ -24,11 +25,18 @@ import {
 } from 'lucide-react';
 
 // ── Custom chart tooltip ──────────────────────────────────────────
-const ChartTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{value: number}>; label?: string }) => {
+const ChartTooltip = ({
+  active, payload, label, colors,
+}: {
+  active?: boolean;
+  payload?: Array<{ value: number }>;
+  label?: string;
+  colors?: { tooltipLabelColor: string; tooltipTextColor: string };
+}) => {
   if (!active || !payload?.length) return null;
   return (
     <div className="glass-strong border border-neon-cyan/20 rounded-lg px-3 py-2">
-      <p className="text-white/40 text-xs font-inter">{label}</p>
+      <p className="text-xs font-inter" style={{ color: colors?.tooltipLabelColor ?? 'rgba(255,255,255,0.4)' }}>{label}</p>
       <p className="text-neon-cyan font-orbitron text-sm font-bold">{payload[0].value}%</p>
     </div>
   );
@@ -117,6 +125,7 @@ const DashboardPage = () => {
   const [scheduledTests, setScheduledTests] = useState<any[]>([]);
   const [startingTestId, setStartingTestId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const chartColors = useChartColors();
 
   useEffect(() => {
     const fetch = async () => {
@@ -143,7 +152,7 @@ const DashboardPage = () => {
 
   const handleStartScheduled = async (test: any) => {
     if (test.status === 'locked' || startingTestId) return;
-    
+
     setError(null);
     setStartingTestId(test._id);
     try {
@@ -215,35 +224,10 @@ const DashboardPage = () => {
 
       {/* ── KPI Stats ─────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard
-          label="Total Tests"
-          value={totalTests}
-          icon={<BookOpen size={20} />}
-          variant="cyan"
-          subtext="Lifetime attempts"
-        />
-        <StatCard
-          label="Avg Score"
-          value={`${avgScore}%`}
-          icon={<TrendingUp size={20} />}
-          variant="violet"
-          subtext="Across all tests"
-          trend={avgScore > 60 ? { value: 5, label: 'vs last month' } : { value: -2, label: 'vs last month' }}
-        />
-        <StatCard
-          label="Best Score"
-          value={`${bestScore}%`}
-          icon={<Trophy size={20} />}
-          variant="green"
-          subtext="Personal record"
-        />
-        <StatCard
-          label="Time Spent"
-          value={`${totalMin}m`}
-          icon={<Clock size={20} />}
-          variant="amber"
-          subtext="Total practice"
-        />
+        <StatCard label="Total Tests" value={totalTests} icon={<BookOpen size={20} />} variant="cyan" subtext="Lifetime attempts" />
+        <StatCard label="Avg Score" value={`${avgScore}%`} icon={<TrendingUp size={20} />} variant="violet" subtext="Across all tests" trend={avgScore > 60 ? { value: 5, label: 'vs last month' } : { value: -2, label: 'vs last month' }} />
+        <StatCard label="Best Score" value={`${bestScore}%`} icon={<Trophy size={20} />} variant="green" subtext="Personal record" />
+        <StatCard label="Time Spent" value={`${totalMin}m`} icon={<Clock size={20} />} variant="amber" subtext="Total practice" />
       </div>
 
       {/* ── Main content grid ─────────────────────────────── */}
@@ -271,16 +255,16 @@ const DashboardPage = () => {
                     <stop offset="95%" stopColor="#00F5FF" stopOpacity={0}   />
                   </linearGradient>
                 </defs>
-                <XAxis dataKey="name" tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis domain={[0, 100]} tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip content={<ChartTooltip />} />
+                <XAxis dataKey="name" tick={{ fill: chartColors.tickFill, fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis domain={[0, 100]} tick={{ fill: chartColors.tickFill, fontSize: 11 }} axisLine={false} tickLine={false} />
+                <Tooltip content={<ChartTooltip colors={chartColors} />} />
                 <Area
                   type="monotone"
                   dataKey="score"
                   stroke="#00F5FF"
                   strokeWidth={2.5}
                   fill="url(#scoreGrad)"
-                  dot={{ fill: '#00F5FF', r: 4, strokeWidth: 2, stroke: '#080810' }}
+                  dot={{ fill: '#00F5FF', r: 4, strokeWidth: 2, stroke: chartColors.dotStroke }}
                   activeDot={{ r: 6, fill: '#00F5FF' }}
                 />
               </AreaChart>
@@ -326,34 +310,10 @@ const DashboardPage = () => {
           Quick Actions
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <QuickAction
-            icon={<Plus size={20} />}
-            label="New Test"
-            desc="Start a practice session"
-            onClick={() => navigate('/test-setup')}
-            color="cyan"
-          />
-          <QuickAction
-            icon={<Flame size={20} />}
-            label="Daily Challenge"
-            desc="Today's problem + streak"
-            onClick={() => navigate('/problem-of-day')}
-            color="amber"
-          />
-          <QuickAction
-            icon={<Brain size={20} />}
-            label="Analysis"
-            desc="View deep analytics"
-            onClick={() => navigate('/analysis')}
-            color="violet"
-          />
-          <QuickAction
-            icon={<Star size={20} />}
-            label="Leaderboard"
-            desc="See global rankings"
-            onClick={() => navigate('/leaderboard')}
-            color="magenta"
-          />
+          <QuickAction icon={<Plus size={20} />} label="New Test" desc="Start a practice session" onClick={() => navigate('/test-setup')} color="cyan" />
+          <QuickAction icon={<Flame size={20} />} label="Daily Challenge" desc="Today's problem + streak" onClick={() => navigate('/problem-of-day')} color="amber" />
+          <QuickAction icon={<Brain size={20} />} label="Analysis" desc="View deep analytics" onClick={() => navigate('/analysis')} color="violet" />
+          <QuickAction icon={<Star size={20} />} label="Leaderboard" desc="See global rankings" onClick={() => navigate('/leaderboard')} color="magenta" />
         </div>
       </div>
 
@@ -383,11 +343,11 @@ const DashboardPage = () => {
                </button>
              </div>
            )}
-           
+
            <div className="grid md:grid-cols-2 gap-4">
              {scheduledTests.map(test => {
                const isLocked = test.status === 'locked';
-               
+
                return (
                  <div key={test._id} className={cn(
                    "p-4 rounded-xl border relative overflow-hidden group transition-all duration-300",
@@ -395,7 +355,7 @@ const DashboardPage = () => {
                  )}>
                    <div className="flex justify-between items-start mb-2">
                      <p className="font-inter font-medium text-white/90 text-sm truncate pr-2 group-hover:text-white">{test.title}</p>
-                     
+
                      {isLocked ? (
                        <span className="flex-shrink-0 flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border border-neon-amber/30 text-neon-amber bg-neon-amber/5 font-mono-code">
                          <Lock size={10} /> LOCKED
@@ -410,9 +370,9 @@ const DashboardPage = () => {
                        </span>
                      )}
                    </div>
-                   
+
                    <p className="text-white/40 text-xs font-inter mb-4 line-clamp-1">{test.topic} · {test.questionCount} Questions · {test.timeLimit} Minutes</p>
-                   
+
                    <div className="flex justify-between items-end">
                      <div>
                        <p className="text-[10px] text-white/30 uppercase tracking-wider font-inter">Scheduled For</p>
@@ -420,10 +380,10 @@ const DashboardPage = () => {
                          {new Date(test.startTime).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
                        </p>
                      </div>
-                     
-                     <HoloButton 
-                       variant={isLocked ? "ghost" : "cyan"} 
-                       size="sm" 
+
+                     <HoloButton
+                       variant={isLocked ? "ghost" : "cyan"}
+                       size="sm"
                        onClick={() => handleStartScheduled(test)}
                        disabled={isLocked || test.status === 'completed'}
                        loading={startingTestId === test._id}
@@ -432,7 +392,7 @@ const DashboardPage = () => {
                        {isLocked ? "Wait" : test.status === 'live' ? "Start Now" : "Missed"}
                      </HoloButton>
                    </div>
-                   
+
                    {/* Background accent */}
                    {!isLocked && test.status === 'live' && (
                      <div className="absolute top-0 right-0 w-32 h-32 bg-neon-cyan/10 blur-3xl -z-10 rounded-full mix-blend-screen transform translate-x-1/2 -translate-y-1/2" />

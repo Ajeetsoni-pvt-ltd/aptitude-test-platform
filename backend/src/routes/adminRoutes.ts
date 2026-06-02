@@ -9,6 +9,8 @@ import {
   getAllUsers,
   updateUserRole,
   deleteUser,
+  getAnalytics,
+  getStudentAnalytics,
 } from '../controllers/adminController';
 import { protect, adminOnly } from '../middlewares/authMiddleware';
 
@@ -19,6 +21,12 @@ router.use(protect, adminOnly);
 
 // GET  /api/admin/stats              → Platform stats
 router.get('/stats', getAdminStats);
+
+// GET  /api/admin/analytics          → Deep analytics
+router.get('/analytics', getAnalytics);
+
+// GET  /api/admin/students/:userId/analytics → Per-student analytics
+router.get('/students/:userId/analytics', getStudentAnalytics);
 
 // GET  /api/admin/users              → All users list
 router.get('/users', getAllUsers);

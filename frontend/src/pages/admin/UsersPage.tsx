@@ -17,6 +17,11 @@ const STYLES = `
     --panel:   rgba(0,245,255,0.04);
     --border:  rgba(0,245,255,0.13);
   }
+  html.light {
+    --dark:    #f0f4f8;
+    --panel:   rgba(0,119,204,0.05);
+    --border:  rgba(0,119,204,0.18);
+  }
 
   @keyframes scanline {
     0%   { transform: translateY(-100%); }
@@ -447,6 +452,24 @@ const STYLES = `
     color:rgba(0,245,255,.4);
     padding:0 .4rem;
   }
+
+  /* ── Light Mode Overrides ── */
+  html.light .up-root { color: #1e293b; }
+  html.light .up-root::before { opacity: 0.3; }
+  html.light .user-card { background: rgba(255,255,255,0.8); border-color: rgba(0,100,180,0.15); box-shadow: 0 1px 8px rgba(0,0,0,0.06); }
+  html.light .user-card:hover { border-color: rgba(0,119,204,0.35); box-shadow: 0 4px 20px rgba(0,0,0,0.10); }
+  html.light .user-name { color: #1e293b; }
+  html.light .user-email { color: rgba(0,80,140,0.65); }
+  html.light .user-joined { color: rgba(30,41,59,0.45); }
+  html.light .cyber-input { color: #1e293b; background: rgba(255,255,255,0.9); border-color: rgba(0,119,204,0.22); }
+  html.light .cyber-input::placeholder { color: rgba(0,119,204,0.35); }
+  html.light .clear-btn { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.14); color: rgba(30,41,59,0.7); }
+  html.light .clear-btn:hover { background: rgba(0,0,0,0.08); color: rgba(30,41,59,0.9); }
+  html.light .btn-spin { border-color: rgba(0,0,0,0.2); }
+  html.light .empty-state { background: rgba(255,255,255,0.8); }
+  html.light .page-btn { background: rgba(255,255,255,0.9); border-color: rgba(0,119,204,0.2); color: rgba(0,100,160,0.8); }
+  html.light .page-info { color: rgba(0,80,130,0.5); }
+  html.light .scanline { opacity: 0.04; }
 `;
 
 /* ─── Component ───────────────────────────────────────────────── */

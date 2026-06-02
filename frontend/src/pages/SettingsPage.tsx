@@ -11,26 +11,38 @@ import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
 // Toggle component
-const Toggle = ({ checked, onChange, label }: { checked: boolean; onChange: () => void; label: string }) => (
-  <div className="flex items-center justify-between py-3 border-b border-white/5 last:border-0">
-    <span className="text-white/60 text-sm font-inter">{label}</span>
-    <button
-      onClick={onChange}
-      className={cn(
-        'w-10 h-5.5 rounded-full border transition-all duration-300 relative flex-shrink-0',
-        checked
-          ? 'bg-neon-cyan/20 border-neon-cyan/50 shadow-[0_0_10px_rgba(0,245,255,0.3)]'
-          : 'bg-white/5 border-white/15'
-      )}
-      style={{ height: '22px', width: '40px' }}
-    >
-      <div className={cn(
-        'absolute top-[3px] w-4 h-4 rounded-full transition-all duration-300',
-        checked ? 'left-[20px] bg-neon-cyan shadow-[0_0_8px_rgba(0,245,255,0.8)]' : 'left-[3px] bg-white/30'
-      )} />
-    </button>
-  </div>
-);
+const Toggle = ({ checked, onChange, label }: { checked: boolean; onChange: () => void; label: string }) => {
+  const { theme } = useThemeStore();
+  const isLight = theme === 'light';
+  return (
+    <div className={cn(
+      'flex items-center justify-between py-3 last:border-0',
+      isLight ? 'border-b border-black/7' : 'border-b border-white/5'
+    )}>
+      <span className={cn(
+        'text-sm font-inter',
+        isLight ? 'text-slate-600' : 'text-white/60'
+      )}>{label}</span>
+      <button
+        onClick={onChange}
+        className={cn(
+          'rounded-full border transition-all duration-300 relative flex-shrink-0',
+          checked
+            ? 'bg-neon-cyan/20 border-neon-cyan/50 shadow-[0_0_10px_rgba(0,119,204,0.3)]'
+            : isLight
+              ? 'bg-black/[0.05] border-black/15'
+              : 'bg-white/5 border-white/15'
+        )}
+        style={{ height: '22px', width: '40px' }}
+      >
+        <div className={cn(
+          'absolute top-[3px] w-4 h-4 rounded-full transition-all duration-300',
+          checked ? 'left-[20px] bg-neon-cyan shadow-[0_0_8px_rgba(0,119,204,0.8)]' : cn('left-[3px]', isLight ? 'bg-slate-400' : 'bg-white/30')
+        )} />
+      </button>
+    </div>
+  );
+};
 
 const ACCENTS = [
   { name: 'Cyan',    color: '#00F5FF' },
@@ -68,7 +80,7 @@ const SettingsPage = () => {
       content: (
         <div className="space-y-6">
           <div>
-            <p className="text-white/40 text-xs uppercase tracking-widest mb-3 font-inter">Theme Preference</p>
+            <p className="text-xs uppercase tracking-widest mb-3 font-inter text-white/40">Theme Preference</p>
             <div className="flex gap-3">
               {[
                 { value: 'light', label: 'Light Mode', icon: <Sun size={16} /> },
@@ -80,8 +92,10 @@ const SettingsPage = () => {
                   className={cn(
                     'flex flex-col items-center gap-2 px-4 py-3 rounded-xl border transition-all duration-300',
                     theme === t.value
-                      ? 'border-neon-cyan/50 bg-neon-cyan/15 text-neon-cyan shadow-[0_0_15px_rgba(0,245,255,0.3)]'
-                      : 'border-white/15 bg-white/5 text-white/40 hover:border-white/30 hover:bg-white/10'
+                      ? 'border-neon-cyan/50 bg-neon-cyan/15 text-neon-cyan shadow-[0_0_15px_rgba(0,119,204,0.25)]'
+                      : theme === 'light'
+                        ? 'border-black/12 bg-black/[0.04] text-slate-500 hover:border-black/22 hover:bg-black/[0.07]'
+                        : 'border-white/15 bg-white/5 text-white/40 hover:border-white/30 hover:bg-white/10'
                   )}
                 >
                   {t.icon}
@@ -92,8 +106,8 @@ const SettingsPage = () => {
             </div>
           </div>
 
-          <div className="border-t border-white/5 pt-6">
-            <p className="text-white/40 text-xs uppercase tracking-widest mb-3 font-inter">Accent Color</p>
+          <div className={cn('pt-6', theme === 'light' ? 'border-t border-black/7' : 'border-t border-white/5')}>
+            <p className="text-xs uppercase tracking-widest mb-3 font-inter text-white/40">Accent Color</p>
             <div className="flex gap-3">
               {ACCENTS.map((a) => (
                 <button
@@ -102,12 +116,12 @@ const SettingsPage = () => {
                   className="flex flex-col items-center gap-1.5"
                 >
                   <div
-                    className={cn('w-10 h-10 rounded-xl transition-all duration-200', accent === a.color && 'ring-2 ring-offset-2 ring-offset-cyber-black scale-110')}
+                    className={cn('w-10 h-10 rounded-xl transition-all duration-200', accent === a.color && 'ring-2 ring-offset-2 ring-offset-white scale-110')}
                     style={{ background: a.color, boxShadow: `0 0 15px ${a.color}55` }}
                   />
                   {accent === a.color && <Check size={10} style={{ color: a.color }} />}
                   {accent !== a.color && <div className="h-[10px]" />}
-                  <p className="text-white/30 text-[10px] font-inter">{a.name}</p>
+                  <p className="text-[10px] font-inter text-white/30">{a.name}</p>
                 </button>
               ))}
             </div>
