@@ -268,8 +268,11 @@ export const generateTutorResponse = async (
   const topic = detectTopic(message);
 
   if (!apiKey) {
+    console.error('[gemini:tutor] GEMINI_API_KEY is missing from environment. AI chat will fail.');
     throw new Error('Gemini API key is not configured. Set GEMINI_API_KEY in the backend environment.');
   }
+
+  console.log('[gemini:tutor] Request received', { topic, model, messageLength: message.length });
 
   const prompt = buildUserPrompt(message, conversationHistory);
   let attempts = 0;

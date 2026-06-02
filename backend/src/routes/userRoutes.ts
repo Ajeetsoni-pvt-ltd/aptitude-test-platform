@@ -47,6 +47,20 @@ router.get('/leaderboard', getLeaderboard);
 router.put('/profile', updateProfile);
 
 // POST /api/users/profile-picture → Upload profile picture
-router.post('/profile-picture', upload.single('profilePicture'), uploadProfilePicture);
+// Wrap multer in error handler to return clear 400 instead of generic 500
+router.post('/profile-picture', (req, res, next) => {
+  upload.single('profilePicture')(req, res, (err) => {
+    if (err) {
+      const message = err instanceof multer.MulterError
+        ? err.code === 'LIMIT_FILE_SIZE'
+          ? 'File size must not exceed 5MB.'
+          : `Upload error: ${err.message}`
+        : err.message || 'File upload failed.';
+      console.error('[multer:error]', { code: (err as any).code, message: err.message });
+      return res.status(400).json({ success: false, message, data: null });
+    }
+    next();
+  });
+}, uploadProfilePicture);
 
 export default router;

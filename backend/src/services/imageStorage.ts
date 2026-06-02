@@ -152,13 +152,21 @@ export const storeUploadedImage = async (
 ) => {
   const processedImage = await processImageBuffer(file.buffer);
   const cloudinaryEnabled =
-    Boolean(process.env.CLOUDINARY_CLOUD_NAME) &&
-    Boolean(process.env.CLOUDINARY_API_KEY) &&
-    Boolean(process.env.CLOUDINARY_API_SECRET);
+    Boolean(process.env.CLOUDINARY_CLOUD_NAME?.trim()) &&
+    Boolean(process.env.CLOUDINARY_API_KEY?.trim()) &&
+    Boolean(process.env.CLOUDINARY_API_SECRET?.trim());
 
   if (cloudinaryEnabled) {
+    console.log('[imageStorage] Uploading to Cloudinary', { folder, originalName: file.originalname });
     return uploadToCloudinary(processedImage, file.originalname, folder);
   }
 
+  if (process.env.NODE_ENV === 'production') {
+    console.warn(
+      '[imageStorage] ⚠️ Cloudinary is NOT configured. Falling back to local storage.',
+      'Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET in .env.production',
+    );
+  }
+  console.log('[imageStorage] Storing locally', { folder, originalName: file.originalname });
   return storeLocally(processedImage, file.originalname, req, folder);
 };
