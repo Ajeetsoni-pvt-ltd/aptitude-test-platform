@@ -32,6 +32,7 @@ import {
   AdminStatusBadge,
 } from '@/components/admin/AdminUI';
 import { getAdminStatsApi } from '@/api/adminApi';
+import { useChartColors } from '@/hooks/useChartColors';
 
 type AdminStats = {
   users?: { total?: number; students?: number; admins?: number };
@@ -43,27 +44,24 @@ type AdminStats = {
   tests?: { total?: number; last7Days?: number; avgScore?: number };
 };
 
-const chartTooltipStyle = {
-  background: 'rgba(8, 12, 24, 0.92)',
-  border: '1px solid rgba(0,245,255,0.18)',
-  borderRadius: '18px',
-  backdropFilter: 'blur(18px)',
-};
-
 const DashboardTooltip = ({
   active,
   payload,
   label,
+  tickFill,
+  textColor,
 }: {
   active?: boolean;
   payload?: Array<{ value: number; name?: string }>;
   label?: string;
+  tickFill?: string;
+  textColor?: string;
 }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div style={chartTooltipStyle} className="px-3 py-2 shadow-[0_20px_50px_rgba(0,0,0,0.35)]">
-      <p className="text-[11px] uppercase tracking-[0.28em] text-white/35">{label}</p>
-      <p className="mt-1 font-orbitron text-sm tracking-[0.12em] text-neon-cyan">
+    <div className="glass-strong border border-neon-cyan/20 px-3 py-2 shadow-[0_20px_50px_rgba(0,0,0,0.35)] rounded-[18px]">
+      <p className="text-[11px] uppercase tracking-[0.28em]" style={{ color: tickFill ?? 'rgba(255,255,255,0.35)' }}>{label}</p>
+      <p className="mt-1 font-orbitron text-sm tracking-[0.12em] text-neon-cyan" style={{ color: textColor }}>
         {payload[0].value}
       </p>
     </div>
@@ -80,6 +78,7 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const chartColors = useChartColors();
 
   useEffect(() => {
     let mounted = true;
@@ -259,16 +258,16 @@ const AdminDashboard = () => {
                         </defs>
                         <XAxis
                           dataKey="slot"
-                          tick={{ fill: 'rgba(255,255,255,0.35)', fontSize: 11 }}
+                          tick={{ fill: chartColors.tickFill, fontSize: 11 }}
                           axisLine={false}
                           tickLine={false}
                         />
                         <YAxis
-                          tick={{ fill: 'rgba(255,255,255,0.28)', fontSize: 11 }}
+                          tick={{ fill: chartColors.tickFillDim, fontSize: 11 }}
                           axisLine={false}
                           tickLine={false}
                         />
-                        <Tooltip content={<DashboardTooltip />} />
+                        <Tooltip content={<DashboardTooltip tickFill={chartColors.tickFill} textColor={chartColors.tooltipTextColor} />} />
                         <Area
                           type="monotone"
                           dataKey="submissions"
@@ -362,16 +361,16 @@ const AdminDashboard = () => {
                     <BarChart data={dashboardData.topics}>
                       <XAxis
                         dataKey="_id"
-                        tick={{ fill: 'rgba(255,255,255,0.35)', fontSize: 11 }}
+                        tick={{ fill: chartColors.tickFill, fontSize: 11 }}
                         axisLine={false}
                         tickLine={false}
                       />
                       <YAxis
-                        tick={{ fill: 'rgba(255,255,255,0.28)', fontSize: 11 }}
+                        tick={{ fill: chartColors.tickFillDim, fontSize: 11 }}
                         axisLine={false}
                         tickLine={false}
                       />
-                      <Tooltip content={<DashboardTooltip />} />
+                      <Tooltip content={<DashboardTooltip tickFill={chartColors.tickFill} textColor={chartColors.tooltipTextColor} />} />
                       <Bar dataKey="count" radius={[16, 16, 6, 6]}>
                         {dashboardData.topics.map((entry, index) => (
                           <Cell

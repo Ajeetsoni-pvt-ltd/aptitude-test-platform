@@ -384,7 +384,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   const currentSidebarWidth = collapsed ? sidebarCollapsedWidth : sidebarExpandedWidth;
 
   return (
-    <div className="flex min-h-screen w-full overflow-hidden bg-cyber-black text-white">
+    <div className="admin-surface flex min-h-screen w-full overflow-hidden bg-cyber-black text-white">
       {/* Background effects layer */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute inset-0 bg-[linear-gradient(rgba(0,245,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,245,255,0.03)_1px,transparent_1px)] bg-[size:90px_90px] opacity-50" />

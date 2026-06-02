@@ -4,6 +4,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getMyResultsApi } from '@/api/testApi';
+import { useChartColors } from '@/hooks/useChartColors';
 import type { TestAttempt } from '@/types';
 import AppLayout from '@/components/layout/AppLayout';
 import NeonCard from '@/components/ui/NeonCard';
@@ -65,6 +66,7 @@ const fmtTime = (secs: number) => {
 
 // ── Heatmap Grid (12-week) ────────────────────────────────────
 const ContributionHeatmap = ({ attempts }: { attempts: TestAttempt[] }) => {
+  const chartColors = useChartColors();
   const weeks = 12;
   const days = 7;
   const today = new Date();
@@ -100,7 +102,7 @@ const ContributionHeatmap = ({ attempts }: { attempts: TestAttempt[] }) => {
               className="rounded-sm aspect-square cursor-default transition-transform hover:scale-125"
               style={{
                 background: cell.count === 0
-                  ? 'rgba(255,255,255,0.04)'
+                  ? chartColors.gridStroke
                   : cell.score >= 70 ? `rgba(0,255,136,${0.2 + cell.count * 0.15})`
                   : cell.score >= 40 ? `rgba(255,183,0,${0.2 + cell.count * 0.15})`
                   : `rgba(255,51,102,${0.2 + cell.count * 0.15})`,
@@ -115,7 +117,7 @@ const ContributionHeatmap = ({ attempts }: { attempts: TestAttempt[] }) => {
           <div
             key={v}
             className="w-3 h-3 rounded-sm"
-            style={{ background: v === 0 ? 'rgba(255,255,255,0.04)' : v >= 70 ? 'rgba(0,255,136,0.5)' : v >= 40 ? 'rgba(255,183,0,0.5)' : 'rgba(255,51,102,0.5)' }}
+            style={{ background: v === 0 ? chartColors.gridStroke : v >= 70 ? 'rgba(0,255,136,0.5)' : v >= 40 ? 'rgba(255,183,0,0.5)' : 'rgba(255,51,102,0.5)' }}
           />
         ))}
         <span className="text-white/20 text-[10px] font-inter">More</span>
@@ -127,6 +129,7 @@ const ContributionHeatmap = ({ attempts }: { attempts: TestAttempt[] }) => {
 // ── Main Page ─────────────────────────────────────────────────
 const AnalysisPage = () => {
   const navigate = useNavigate();
+  const chartColors = useChartColors();
 
   // Data state
   const [attempts,  setAttempts]  = useState<TestAttempt[]>([]);
@@ -447,9 +450,9 @@ const AnalysisPage = () => {
                       <stop offset="95%" stopColor="#00F5FF" stopOpacity={0}   />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid stroke="rgba(255,255,255,0.04)" strokeDasharray="4 4" />
-                  <XAxis dataKey="name" tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <YAxis domain={[0, 100]} tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <CartesianGrid stroke={chartColors.gridStroke} strokeDasharray="4 4" />
+                  <XAxis dataKey="name" tick={{ fill: chartColors.tickFill, fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis domain={[0, 100]} tick={{ fill: chartColors.tickFill, fontSize: 10 }} axisLine={false} tickLine={false} />
                   <Tooltip content={<NeonTooltip />} />
                   <Line type="monotone" dataKey="score" stroke="#00F5FF" strokeWidth={2.5}
                     dot={{ fill: '#00F5FF', r: 3, strokeWidth: 2, stroke: '#080810' }} name="score" />
@@ -476,12 +479,12 @@ const AnalysisPage = () => {
               </div>
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={distData} barSize={28}>
-                  <XAxis dataKey="range" tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <YAxis allowDecimals={false} tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <XAxis dataKey="range" tick={{ fill: chartColors.tickFill, fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis allowDecimals={false} tick={{ fill: chartColors.tickFill, fontSize: 10 }} axisLine={false} tickLine={false} />
                   <Tooltip
                     cursor={{ fill: 'rgba(157,0,255,0.05)' }}
-                    contentStyle={{ background: 'rgba(13,13,26,0.95)', border: '1px solid rgba(157,0,255,0.3)', borderRadius: 8 }}
-                    labelStyle={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}
+                    contentStyle={chartColors.tooltipStyle}
+                    labelStyle={{ color: chartColors.tooltipLabelColor, fontSize: 11 }}
                     itemStyle={{ color: '#9D00FF' }}
                   />
                   <Bar dataKey="count" radius={4}>
@@ -530,8 +533,8 @@ const AnalysisPage = () => {
               <h2 className="font-inter font-semibold text-white mb-4">Skills Radar</h2>
               <ResponsiveContainer width="100%" height={200}>
                 <RadarChart data={radarData}>
-                  <PolarGrid stroke="rgba(255,255,255,0.06)" />
-                  <PolarAngleAxis dataKey="subject" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
+                  <PolarGrid stroke={chartColors.gridStroke} />
+                  <PolarAngleAxis dataKey="subject" tick={{ fill: chartColors.tickFill, fontSize: 11 }} />
                   <Radar name="Score" dataKey="value" stroke="#FF00AA" fill="#FF00AA" fillOpacity={0.15}
                     strokeWidth={2} style={{ filter: 'drop-shadow(0 0 4px rgba(255,0,170,0.6))' }} />
                 </RadarChart>

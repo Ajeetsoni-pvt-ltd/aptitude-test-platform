@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import AdminLayout from '@/components/AdminLayout';
 import NeonCard from '@/components/ui/NeonCard';
 import HoloButton from '@/components/ui/HoloButton';
+import DateTimePickerPopup from '@/components/ui/DateTimePickerPopup';
+import SectionStudentPicker from '@/components/ui/SectionStudentPicker';
 import { downloadBulkTemplateApi, getAllUsersApi, type BulkUploadResult } from '@/api/adminApi';
 import { createFullLengthTestApi, getAllScheduledTestsApi } from '@/api/scheduledApi';
 import { cn } from '@/lib/utils';
@@ -28,6 +30,8 @@ interface StudentOption {
   name: string;
   email: string;
   avatar: string;
+  branch?: string;
+  section?: string;
 }
 
 interface ScheduledTestCard {
@@ -64,11 +68,12 @@ const CreateTestPage = () => {
   const [startTime, setStartTime] = useState('');
   const [endDate, setEndDate] = useState('');
   const [endTime, setEndTime] = useState('');
+  const [startDateTime, setStartDateTime] = useState<Date | null>(null);
+  const [endDateTime, setEndDateTime] = useState<Date | null>(null);
   const [workbook, setWorkbook] = useState<File | null>(null);
   const [imagesZip, setImagesZip] = useState<File | null>(null);
   const [students, setStudents] = useState<StudentOption[]>([]);
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
-  const [search, setSearch] = useState('');
   const [maxAttempts, setMaxAttempts] = useState(1);
   const [scheduledTests, setScheduledTests] = useState<ScheduledTestCard[]>([]);
   const [uploadResult, setUploadResult] = useState<BulkUploadResult | null>(null);
@@ -79,6 +84,36 @@ const CreateTestPage = () => {
   const [success, setSuccess] = useState('');
   const workbookRef = useRef<HTMLInputElement>(null);
   const zipRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (startDate && startTime) {
+      const d = new Date(`${startDate}T${startTime}`);
+      if (!Number.isNaN(d.getTime())) setStartDateTime(d);
+    } else {
+      setStartDateTime(null);
+    }
+  }, [startDate, startTime]);
+
+  useEffect(() => {
+    if (endDate && endTime) {
+      const d = new Date(`${endDate}T${endTime}`);
+      if (!Number.isNaN(d.getTime())) setEndDateTime(d);
+    } else {
+      setEndDateTime(null);
+    }
+  }, [endDate, endTime]);
+
+  const handleStartPickerChange = (d: Date) => {
+    setStartDateTime(d);
+    setStartDate(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
+    setStartTime(d.toTimeString().substring(0, 5));
+  };
+
+  const handleEndPickerChange = (d: Date) => {
+    setEndDateTime(d);
+    setEndDate(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
+    setEndTime(d.toTimeString().substring(0, 5));
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -104,6 +139,8 @@ const CreateTestPage = () => {
                   name: displayName,
                   email: user.email || 'No email available',
                   avatar: getInitials(displayName),
+                  branch: user.branch,
+                  section: user.section,
                 };
               })
               .sort((a, b) => a.name.localeCompare(b.name))
@@ -147,26 +184,15 @@ const CreateTestPage = () => {
     load();
   }, []);
 
-  const filteredStudents = useMemo(
-    () =>
-      students.filter((student) =>
-        [student.name, student.email].some((value) => value.toLowerCase().includes(search.toLowerCase()))
-      ),
-    [students, search]
-  );
-
   const invalidRows = useMemo(
     () => uploadResult?.rows.filter((row) => row.status === 'invalid') || [],
     [uploadResult]
   );
 
   const windowRange = useMemo(() => {
-    if (!startDate || !startTime || !endDate || !endTime) return null;
-    const start = new Date(`${startDate}T${startTime}`);
-    const end = new Date(`${endDate}T${endTime}`);
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
-    return { start, end };
-  }, [startDate, startTime, endDate, endTime]);
+    if (!startDateTime || !endDateTime) return null;
+    return { start: startDateTime, end: endDateTime };
+  }, [startDateTime, endDateTime]);
 
   const setWorkbookFile = (file: File | null) => {
     if (!file) {
@@ -269,6 +295,8 @@ const CreateTestPage = () => {
       setStartTime('');
       setEndDate('');
       setEndTime('');
+      setStartDateTime(null);
+      setEndDateTime(null);
       setWorkbook(null);
       setImagesZip(null);
       setSelectedStudents([]);
@@ -349,7 +377,7 @@ const CreateTestPage = () => {
                     </button>
                   </div>
                   <div className="grid md:grid-cols-2 gap-4">
-                    <label className="border-2 border-dashed border-white/10 rounded-2xl p-5 text-center cursor-pointer block">
+                    <div className="relative border-2 border-dashed border-white/10 rounded-2xl p-5 text-center cursor-pointer block hover:border-neon-cyan/50 hover:bg-neon-cyan/5 transition-colors group">
                       <input
                         ref={workbookRef}
                         type="file"
@@ -357,12 +385,17 @@ const CreateTestPage = () => {
                         className="hidden"
                         onChange={(event) => setWorkbookFile(event.target.files?.[0] ?? null)}
                       />
-                      <div onClick={() => workbookRef.current?.click()}>
-                        <FileSpreadsheet size={24} className="text-white/25 mx-auto mb-3" />
-                        <p className="text-white/70 text-sm">{workbook ? workbook.name : 'Select workbook'}</p>
+                      <div onClick={() => !workbook && workbookRef.current?.click()} className="h-full flex flex-col justify-center">
+                        <FileSpreadsheet size={24} className={cn("mx-auto mb-3 transition-colors", workbook ? "text-neon-cyan" : "text-white/25 group-hover:text-neon-cyan/50")} />
+                        <p className={cn("text-sm", workbook ? "text-white" : "text-white/70")}>{workbook ? workbook.name : 'Select workbook'}</p>
                       </div>
-                    </label>
-                    <label className="border border-dashed border-white/10 rounded-2xl p-5 text-center cursor-pointer block">
+                      {workbook && (
+                        <button onClick={(e) => { e.stopPropagation(); setWorkbookFile(null); if (workbookRef.current) workbookRef.current.value = ''; }} className="absolute top-2 right-2 p-1 rounded hover:bg-white/10 text-white/50 hover:text-white">
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                    <div className="relative border border-dashed border-white/10 rounded-2xl p-5 text-center cursor-pointer block hover:border-neon-magenta/50 hover:bg-neon-magenta/5 transition-colors group">
                       <input
                         ref={zipRef}
                         type="file"
@@ -370,11 +403,16 @@ const CreateTestPage = () => {
                         className="hidden"
                         onChange={(event) => setZipFile(event.target.files?.[0] ?? null)}
                       />
-                      <div onClick={() => zipRef.current?.click()}>
-                        <ImageIcon size={22} className="text-white/25 mx-auto mb-3" />
-                        <p className="text-white/70 text-sm">{imagesZip ? imagesZip.name : 'Optional images .zip'}</p>
+                      <div onClick={() => !imagesZip && zipRef.current?.click()} className="h-full flex flex-col justify-center">
+                        <ImageIcon size={22} className={cn("mx-auto mb-3 transition-colors", imagesZip ? "text-neon-magenta" : "text-white/25 group-hover:text-neon-magenta/50")} />
+                        <p className={cn("text-sm", imagesZip ? "text-white" : "text-white/70")}>{imagesZip ? imagesZip.name : 'Optional images .zip'}</p>
                       </div>
-                    </label>
+                      {imagesZip && (
+                        <button onClick={(e) => { e.stopPropagation(); setZipFile(null); if (zipRef.current) zipRef.current.value = ''; }} className="absolute top-2 right-2 p-1 rounded hover:bg-white/10 text-white/50 hover:text-white">
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                   {uploadResult && (
                     <div className="grid grid-cols-3 gap-3 mt-4">
@@ -403,22 +441,63 @@ const CreateTestPage = () => {
               </div>
             </NeonCard>
 
-            <NeonCard variant="violet" padding="p-6">
+            <NeonCard variant="violet" padding="p-6" className="!overflow-visible z-10">
               <h2 className="font-inter font-semibold text-white mb-4 flex items-center gap-2">
                 <Calendar size={17} className="text-neon-violet" />
                 Step 2 - Schedule Window
               </h2>
-              <div className="grid md:grid-cols-2 gap-4">
-                <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} className="cyber-input w-full px-4 py-3 text-sm" />
-                <input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} className="cyber-input w-full px-4 py-3 text-sm" />
-                <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} className="cyber-input w-full px-4 py-3 text-sm" />
-                <input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} className="cyber-input w-full px-4 py-3 text-sm" />
+              <div className="space-y-4">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <div className="flex justify-between items-center mb-1.5">
+                      <label className="text-xs font-medium text-white/70">Start Date & Time</label>
+                      <DateTimePickerPopup
+                        value={startDateTime}
+                        onChange={handleStartPickerChange}
+                        accentColor="violet"
+                        trigger={
+                          <button type="button" className="flex items-center gap-1.5 text-[10px] text-neon-violet hover:text-white transition-colors bg-neon-violet/10 px-2 py-1 rounded border border-neon-violet/30">
+                            <Calendar size={12} />
+                            <span>Quick Pick</span>
+                          </button>
+                        }
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} className="cyber-input w-full px-3 py-2 text-sm" />
+                      <input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} className="cyber-input w-full px-3 py-2 text-sm" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between items-center mb-1.5">
+                      <label className="text-xs font-medium text-white/70">End Date & Time</label>
+                      <DateTimePickerPopup
+                        value={endDateTime}
+                        onChange={handleEndPickerChange}
+                        minDate={startDateTime || new Date()}
+                        accentColor="violet"
+                        trigger={
+                          <button type="button" className="flex items-center gap-1.5 text-[10px] text-neon-violet hover:text-white transition-colors bg-neon-violet/10 px-2 py-1 rounded border border-neon-violet/30">
+                            <Calendar size={12} />
+                            <span>Quick Pick</span>
+                          </button>
+                        }
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} className="cyber-input w-full px-3 py-2 text-sm" />
+                      <input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} className="cyber-input w-full px-3 py-2 text-sm" />
+                    </div>
+                  </div>
+                </div>
               </div>
               {windowRange && (
                 <div className="mt-4 rounded-xl border border-neon-amber/20 bg-neon-amber/5 p-4 text-xs font-inter text-white/60">
                   Students can start only between{' '}
-                  {windowRange.start.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })} and{' '}
-                  {windowRange.end.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}.
+                  <span className="text-neon-amber font-medium">{windowRange.start.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                  {' '}and{' '}
+                  <span className="text-neon-amber font-medium">{windowRange.end.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>.
                 </div>
               )}
             </NeonCard>
@@ -429,32 +508,6 @@ const CreateTestPage = () => {
                   <Users size={17} className="text-neon-magenta" />
                   Step 3 - Assign Students
                 </h2>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setSelectedStudents(filteredStudents.map((student) => student.id))} className="text-xs text-neon-cyan">
-                    Select All
-                  </button>
-                  <span className="text-white/20">·</span>
-                  <button onClick={() => setSelectedStudents([])} className="text-xs text-white/40">
-                    Clear
-                  </button>
-                </div>
-              </div>
-              <div className="flex items-center justify-between gap-3 mb-3 text-xs">
-                <p className="text-white/35">
-                  {selectedStudents.length} selected
-                </p>
-                <p className="text-white/25">
-                  {filteredStudents.length} visible
-                </p>
-              </div>
-              <div className="relative mb-4">
-                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25" />
-                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search students..." className="cyber-input w-full pl-9 pr-10 py-2.5 text-sm" />
-                {search && (
-                  <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/25">
-                    <X size={14} />
-                  </button>
-                )}
               </div>
               {loadingUsers ? (
                 <div className="py-8 text-center text-white/30 text-sm">Loading students...</div>
@@ -462,46 +515,17 @@ const CreateTestPage = () => {
                 <div className="rounded-xl border border-neon-red/20 bg-neon-red/5 px-4 py-6 text-center">
                   <p className="text-neon-red text-sm">{studentLoadError}</p>
                 </div>
-              ) : filteredStudents.length === 0 ? (
+              ) : students.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-8 text-center">
-                  <p className="text-white/65 text-sm">
-                    {students.length === 0 ? 'No student accounts are available yet.' : 'No students match your search.'}
-                  </p>
-                  <p className="text-white/30 text-xs mt-1">
-                    {students.length === 0 ? 'Create or restore student users to assign this test.' : 'Clear the search to see all available students.'}
-                  </p>
+                  <p className="text-white/65 text-sm">No student accounts are available yet.</p>
+                  <p className="text-white/30 text-xs mt-1">Create or restore student users to assign this test.</p>
                 </div>
               ) : (
-                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                  {filteredStudents.map((student) => {
-                    const selected = selectedStudents.includes(student.id);
-                    return (
-                      <button
-                        key={student.id}
-                        onClick={() =>
-                          setSelectedStudents((prev) =>
-                            selected ? prev.filter((id) => id !== student.id) : [...prev, student.id]
-                          )
-                        }
-                        className={cn(
-                          'w-full flex items-center gap-3 p-3 rounded-xl border text-left',
-                          selected ? 'border-neon-magenta/50 bg-neon-magenta/10' : 'border-white/5 bg-white/[0.015]'
-                        )}
-                      >
-                        <div className={cn('w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold', selected ? 'bg-neon-magenta/30 text-neon-magenta' : 'bg-white/10 text-white/50')}>
-                          {student.avatar}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className={cn('text-sm font-medium', selected ? 'text-neon-magenta' : 'text-white/70')}>{student.name}</p>
-                          <p className="text-white/25 text-[11px] truncate">{student.email}</p>
-                        </div>
-                        <div className={cn('w-5 h-5 rounded border-2 flex items-center justify-center', selected ? 'bg-neon-magenta border-neon-magenta' : 'border-white/15')}>
-                          {selected && <CheckCircle2 size={12} className="text-white" />}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+                <SectionStudentPicker 
+                  students={students}
+                  selectedIds={selectedStudents}
+                  onChange={setSelectedStudents}
+                />
               )}
             </NeonCard>
 

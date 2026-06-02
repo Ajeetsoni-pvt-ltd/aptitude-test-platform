@@ -34,9 +34,9 @@ const CyberInput = forwardRef<HTMLInputElement, CyberInputProps>(
             className={cn(
               'cyber-input w-full h-11 font-inter text-sm',
               'px-4',
-              icon    && 'pl-10',
+              icon      && 'pl-10',
               rightIcon && 'pr-10',
-              error && 'border-neon-red/50 focus:border-neon-red/70 focus:shadow-[0_0_0_3px_rgba(255,51,102,0.1)]',
+              error && 'border-neon-red/50 focus:border-neon-red/70 focus:shadow-[0_0_0_3px_rgba(204,34,68,0.1)]',
               className
             )}
           />

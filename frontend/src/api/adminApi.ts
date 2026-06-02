@@ -198,3 +198,8 @@ export const getQuestionMetadataApi = async (topic?: string) => {
   const response = await apiClient.get(`/questions/metadata/all?${params}`);
   return response.data;
 };
+
+export const getAdminAnalyticsApi = async () => {
+  const response = await apiClient.get('/admin/analytics');
+  return response.data;
+};
